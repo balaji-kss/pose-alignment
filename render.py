@@ -1,52 +1,60 @@
 import numpy as np
 import cv2
+import sys
+import coloring
+import mmcv
+import utils
+import pickle
 
 jointMapping = {
-    "Neck": 8,
-    "Thorax": 7,
-    "Head": 9,
-    "Right shoulder": 12,
-    "Left shoulder": 13,
-    "Right elbow": 11,
-    "Left elbow": 14,
-    "Left wrist": 15,
-    "Right hip": 2,
-    "Left hip": 3,
-    "Right wrist": 10,
-    "Left wrist": 15,
-    "Right knee": 1,
-    "Left knee": 4,
-    "Left ankle": 5,
-    "Right ankle": 0,
-    "Right heel": 23,
-    "Right toe": 21,
-    "Left toe": 22,
-    "Left heel": 24,
-    "Left eye": 19,
-    "Right eye": 17,
+    "Neck": 9,
+    "Thorax": 8,
+    "Head": 10,
+    "Right shoulder": 14,
+    "Left shoulder": 11,
+    "Right elbow": 15,
+    "Left elbow": 12,
+    "Right wrist": 16,
+    "Left wrist": 13,
+    "Right hip": 1,
+    "Left hip": 4,
+    "Right knee": 2,
+    "Left knee": 5,
+    "Left ankle": 6,
+    "Right ankle": 3,
+    "Left eye": 18,
+    "Right eye": 19,
     "Left ear": 20,
-    "Right ear": 18,
-    "Neck base": 16
+    "Right ear": 21,
+    "Neck base": 22
 }
 
 skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["Right hip", "Right shoulder"],
                    ["Right shoulder", "Right elbow"], ["Left shoulder", "Left elbow"], ["Right elbow", "Right wrist"],
                    ["Left elbow", "Left wrist"], ["Left knee", "Left ankle"], ["Left shoulder", "Neck"],
                    ["Neck", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
-                   ["Left hip", "Left knee"], ["Right ankle", "Right heel"], ["Right ankle", "Right toe"],
-                   ["Left ankle", "Left heel"], ["Left ankle", "Left toe"], ["Neck", "Head"]]
+                   ["Left hip", "Left knee"], ["Neck", "Head"]]
 
+angle_bounds = {
+    'trunk': [[0, 7.5], [7.5, 15], [15, 22.5], [22.5, 30], [30, sys.maxsize]],
+    'arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],  
+    'fore_arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],
+    'thigh': [[0, 7.5], [7.5, 15], [15, 22.5], [22.5, 30], [30, sys.maxsize]],
+    'leg': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],
+}
 
-def get_head_point(data_2d, joint_table, frame_no, thresh = 0.5):
+colors = [[(0, 255, 0)], [(0, 255, 0), (0, 103, 255)], [(0, 103, 255)], [(0, 103, 255), (0, 0, 255)], [(0, 0, 255)]]
 
-    is_valid = valid_head_point(data_2d, joint_table, frame_no, thresh = thresh)
+def get_head_point(joints, thresh = 0.5):
+
+    is_valid = valid_head_point(joints, thresh = thresh)
         
     if not is_valid:
         return np.array([-1, -1])
 
-    neck_p = data_2d[frame_no][jointMapping["Neck"] * 2:jointMapping["Neck"] * 2 + 2]
-    lear_p = data_2d[frame_no][jointMapping["Left ear"] * 2:jointMapping["Left ear"] * 2 + 2]
-    rear_p = data_2d[frame_no][jointMapping["Right ear"] * 2:jointMapping["Right ear"] * 2 + 2]
+    neck_p = joints[jointMapping["Neck"], :2]
+    lear_p = joints[jointMapping["Left ear"], :2]
+    rear_p = joints[jointMapping["Right ear"], :2]
 
     neck_p = np.array(neck_p)
     lear_p = np.array(lear_p)
@@ -57,13 +65,13 @@ def get_head_point(data_2d, joint_table, frame_no, thresh = 0.5):
 
     return head_p
 
-def valid_head_point(data_2d, joint_table, frame_no, thresh):
+def valid_head_point(joints, thresh):
 
     joint_names = ["Neck base", "Left eye", "Right eye"]
 
     for j in joint_names:
-        p = data_2d[frame_no][jointMapping[j] * 2:jointMapping[j] * 2 + 2]
-        score = joint_table.jointScores[frame_no][jointMapping[j]]
+        p = joints[jointMapping[j], :2]
+        score = joints[jointMapping[j], 2]
         
         if (p[0] < 0 or p[1] < 0 or score < thresh):
             return False
@@ -79,84 +87,123 @@ def interpolate_point(A, B, t):
 
     return np.array([x, y])
 
+def get_point(joints, joint_name):
+
+    if (joint_name == "Head"):
+        return get_head_point(joints)
+        
+    return joints[jointMapping[joint_name], :2]
+
+def getColor(joints, deviations):
+
+    if (joints == ["Left hip", "Left shoulder"] or \
+        joints == ["Right hip", "Left hip"] or \
+        joints == ["Right hip", "Right shoulder"]):
+        return get_color_helper(0, "trunk", deviations)
+    if (joints == ["Right shoulder", "Right elbow"]):
+        return get_color_helper(2, "arm", deviations)
+    if (joints == ["Left shoulder", "Left elbow"]):
+        return get_color_helper(1, "arm", deviations)
+    if (joints == ["Left elbow", "Left wrist"]):
+        return get_color_helper(3, "fore_arm", deviations)
+    if (joints == ["Right elbow", "Right wrist"]):
+        return get_color_helper(4, "fore_arm", deviations)
+    
+    if (joints == ["Right hip", "Right knee"]):
+        return get_color_helper(6, "thigh", deviations)
+    if (joints == ["Left hip", "Left knee"]):
+        return get_color_helper(5, "thigh", deviations)
+    if (joints == ["Right knee", "Right ankle"]):
+        return get_color_helper(8, "leg", deviations)
+    if (joints == ["Left knee", "Left ankle"]):
+        return get_color_helper(7, "leg", deviations)
+    
+    return (0, 255, 0)
+
+def get_color_helper(id_, joint_name, deviations):
+    
+    angle = deviations[id_]
+    color = coloring.get_color(joint_name, angle_bounds, angle, colors)
+
+    return color
+
 def get_skeleton_thickness(frame_size):
     smaller_dim = int(min(frame_size[0], frame_size[1]))
     thickness = int(max(1, smaller_dim/120))
     return thickness
 
+def drawSkeleton(frame, joints_2d, deviations, base=False, thresh=0.35):
 
-def get_point(joint_table, frame_no, joint_name):
-    data_2d = joint_table.joints2D
-
-    if (joint_name == "Head"):
-        return get_head_point(data_2d, joint_table, frame_no)
-        
-    return data_2d[frame_no][jointMapping[joint_name] * 2:jointMapping[joint_name] * 2 + 2]
-
-def drawSkeleton(frame, frameNo, joint_table, prevColor, is_portrait):
-
-    data_2d = joint_table.joints2D
-    data_3d = joint_table.processed_3D_joints
-    
-    if (len(data_2d[frameNo]) == 0):
-        return frame
-            
     for pair in skeletonMapping:
-        startPoint = get_point(joint_table, frameNo, pair[0])
-        endPoint = get_point(joint_table, frameNo, pair[1])
-        start_score = joint_table.jointScores[frameNo][jointMapping[pair[0]]]
-        end_score = joint_table.jointScores[frameNo][jointMapping[pair[1]]]
-        if (startPoint[0] < 0 or startPoint[1] < 0 or endPoint[0] < 0 or endPoint[1] < 0 or start_score < .35 or end_score < .35):
+        startPoint = get_point(joints_2d, pair[0])
+        endPoint = get_point(joints_2d, pair[1])
+        start_score = joints_2d[jointMapping[pair[0]], 2]
+        end_score = joints_2d[jointMapping[pair[1]], 2]
+        if (startPoint[0] < 0 or startPoint[1] < 0 or endPoint[0] < 0 or endPoint[1] < 0 or start_score < thresh or end_score < thresh):
             continue
-        startPoint = (int(startPoint[0] * frame.shape[1]), int(startPoint[1] * frame.shape[0]))
-        endPoint = (int(endPoint[0] * frame.shape[1]), int(endPoint[1] * frame.shape[0]))
-        color = getColor(pair, data_3d, frameNo, prevColor)
+        startPoint = (int(startPoint[0]), int(startPoint[1]))
+        endPoint = (int(endPoint[0]), int(endPoint[1]))
+
+        if base:color = (0, 255, 0)
+        else: color = getColor(pair, deviations)
+
+        print('startPoint ', startPoint)
+        print('endPoint ', endPoint)
+        print('color ', color)
 
         frame = cv2.line(frame, startPoint, endPoint, color, get_skeleton_thickness(frame.shape))
     
     return frame
 
-def getColor(joints, data_3d, frame_no, prevColor):
-    if (joints == ["Left hip", "Left shoulder"] or \
-        joints == ["Right hip", "Left hip"] or \
-        joints == ["Right hip", "Right shoulder"]):
-        return get_color_helper("Hip", data_3d, frame_no, prevColor)
-    if (joints == ["Right shoulder", "Right elbow"]):
-        return get_color_helper("Right shoulder", data_3d, frame_no, prevColor)
-    if (joints == ["Left shoulder", "Left elbow"]):
-        return get_color_helper("Left shoulder", data_3d, frame_no, prevColor)
-    if (joints == ["Left elbow", "Left wrist"]):
-        return get_color_helper("Left elbow", data_3d, frame_no, prevColor)
-    if (joints == ["Right elbow", "Right wrist"]):
-        return get_color_helper("Right elbow", data_3d, frame_no, prevColor)
-    if (joints == ["Neck", "Head"]):
-        return get_color_helper("Neck", data_3d, frame_no, prevColor)
-    return (0, 255, 0)
-
-def get_color_helper(jointClass, data_3d, frame_no, prevColor):
-    angle = data_3d[jointClass][frame_no]
-
-    if (angle == -1):
-        if ("elbow" in jointClass):
-            return prevColor["elbow"]
-        if "Neck" in jointClass:
-            return (0, 255, 0)
-
-        return prevColor[jointClass]
-
-    new_color = skeleton_coloring.get_color(
-        jointClass, angle
-    )
-
-    if ("elbow" in jointClass):
-        side = jointClass.split(" ")[0]
-        shoulder_angle_key = f"{side} shoulder"
-        shoulder_angle = data_3d[shoulder_angle_key][frame_no]
-        cutoff = skeleton_coloring.SKELETON_COLORING["constants"]["lower_arm_cutoff"]
-        if (shoulder_angle <= cutoff):
-            new_color = skeleton_coloring.SKELETON_COLORING[jointClass]["default"]["Color"]
+def print_deviations(frame, deviations):
 
     
-    prevColor[jointClass] = new_color
 
-    return prevColor[jointClass]
+def render_results(bvideo_path, cvideo_path, deviations_list):
+
+    bvideo = mmcv.VideoReader(bvideo_path)
+    cvideo = mmcv.VideoReader(cvideo_path)
+
+    v1_seg, v2_seg = utils.get_segs()
+
+    # Iterate through both videos
+    gidx = 0
+    for i in range(len(v1_seg)):
+        
+        bseg, cseg = utils.normalize_segment(v1_seg[i], v2_seg[i]) # make sure the length of the segments are same
+        print(len(bseg), len(cseg))
+
+        for b, c in zip(bseg, cseg):
+
+            bframe = bvideo[b]
+            cframe = cvideo[c]  
+
+            bjoints_2d = deviations_list[gidx]['bjoints_2d']
+            cjoints_2d = deviations_list[gidx]['cjoints_2d']
+            deviations = deviations_list[gidx]['deviations']
+
+            bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=0.35)
+            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=0.35)
+
+            bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
+            cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
+
+            gidx += 1
+
+            cv2.imshow('Baseline ', bframe)
+            cv2.imshow('Candidate ', cframe)
+            cv2.waitKey(-1)
+
+if __name__ == "__main__":
+
+    act_name = 'Serving_from_Basket' # 'Pushing_cart' # 'Removing_Item_from_Bottom_of_Cart' # 'Lower_Galley_Carrier'
+    root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'    
+
+    bvideo_path = root_pose + '/baseline/baseline.mov'
+    cvideo_path = root_pose + '/candidate/candidate.mov'
+    deviation_path = root_pose + 'deviations.pkl'
+    
+    with open(deviation_path, 'rb') as f:
+        deviations = pickle.load(f)
+
+    render_results(bvideo_path, cvideo_path, deviations)
