@@ -60,6 +60,54 @@ def get_right_arm_vector(joints_3d):
 
     return rarm_vector, [rshoulder, relbow]
 
+def get_left_forearm_vector(joints_3d):
+
+    lelbow = joints_3d[12]
+    lwrist = joints_3d[13]
+
+    lfarm_vector = _normalize(lwrist - lelbow)  
+
+    return lfarm_vector, [lwrist, lelbow]
+
+def get_right_forearm_vector(joints_3d):
+
+    relbow = joints_3d[15]
+    rwrist = joints_3d[16]
+
+    lfarm_vector = _normalize(rwrist - relbow)  
+
+    return lfarm_vector, [rwrist, relbow]
+
+def get_left_farm_dev(base_joints_3d, cand_joints_3d):
+
+    blfarm_vector, _ = get_left_forearm_vector(base_joints_3d)
+    clfarm_vector, _ = get_left_forearm_vector(cand_joints_3d)
+
+    blarm_vector, _ = get_left_arm_vector(base_joints_3d)
+    clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
+
+    base_angle = np.arccos(np.dot(blfarm_vector, blarm_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(clfarm_vector, clarm_vector)) * 180.0 / np.pi
+
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
+def get_right_farm_dev(base_joints_3d, cand_joints_3d):
+
+    brfarm_vector, _ = get_right_forearm_vector(base_joints_3d)
+    crfarm_vector, _ = get_right_forearm_vector(cand_joints_3d)
+
+    brarm_vector, _ = get_right_arm_vector(base_joints_3d)
+    crarm_vector, _ = get_right_arm_vector(cand_joints_3d)
+
+    base_angle = np.arccos(np.dot(brfarm_vector, brarm_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(crfarm_vector, crarm_vector)) * 180.0 / np.pi
+
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
 def get_right_arm_dev(base_joints_3d, cand_joints_3d):
 
     brarm_vector, _ = get_right_arm_vector(base_joints_3d)
@@ -128,20 +176,32 @@ def get_left_leg_dev(base_joints_3d, cand_joints_3d):
     blleg_vector, _ = get_left_leg_vector(base_joints_3d)
     clleg_vector, _ = get_left_leg_vector(cand_joints_3d)
 
-    lleg_dev = np.arccos(np.dot(clleg_vector, blleg_vector)) * 180.0 / np.pi
+    blthigh_vector, _ = get_left_thigh_vector(base_joints_3d)
+    clthigh_vector, _ = get_left_thigh_vector(cand_joints_3d)
 
-    return np.round(lleg_dev, 2)
+    base_angle = np.arccos(np.dot(blthigh_vector, blleg_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(clthigh_vector, clleg_vector)) * 180.0 / np.pi
+
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
 
 def get_right_leg_dev(base_joints_3d, cand_joints_3d):
 
     brleg_vector, _ = get_right_leg_vector(base_joints_3d)
     crleg_vector, _ = get_right_leg_vector(cand_joints_3d)
 
-    rleg_dev = np.arccos(np.dot(crleg_vector, brleg_vector)) * 180.0 / np.pi
+    brthigh_vector, _ = get_right_thigh_vector(base_joints_3d)
+    crthigh_vector, _ = get_right_thigh_vector(cand_joints_3d)
 
-    return np.round(rleg_dev, 2)
+    base_angle = np.arccos(np.dot(brthigh_vector, brleg_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(crthigh_vector, crleg_vector)) * 180.0 / np.pi
 
-def calc_dev(base_joints_3d, cand_joints_3d):
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
+def calc_dev_all(base_joints_3d, cand_joints_3d):
 
     trunk_dev = get_trunk_dev(base_joints_3d, cand_joints_3d)
 
@@ -183,6 +243,13 @@ def get_hip_vector(joints_3d):
 
     return lhip - rhip
 
+def get_shoulder_vector(joints_3d):
+
+    lshoulder = joints_3d[14]
+    rshoulder = joints_3d[11]
+
+    return lshoulder - rshoulder
+
 def align_hip(base_joints_3d, cand_joints_3d):
 
     bhip = get_hip_vector(base_joints_3d)
@@ -190,12 +257,17 @@ def align_hip(base_joints_3d, cand_joints_3d):
 
     rotation_matrix = find_rotation_matrix(chip, bhip)
     rot_cand_joints_3d = np.dot(cand_joints_3d, rotation_matrix.T)    
-    # A = base_joints_3d[[1, 4, 11, 14]]
-    # B = cand_joints_3d[[1, 4, 11, 14]]
+    
+    return rot_cand_joints_3d
 
-    # transform_matrix = find_rigid_transform(B, A)
-    # rot_cand_joints_3d = apply_transformation_to_pose(cand_joints_3d, transform_matrix)
+def align_shoulder(base_joints_3d, cand_joints_3d):
 
+    bshoulder = get_shoulder_vector(base_joints_3d)
+    cshoulder = get_shoulder_vector(cand_joints_3d)
+
+    rotation_matrix = find_rotation_matrix(cshoulder, bshoulder)
+    rot_cand_joints_3d = np.dot(cand_joints_3d, rotation_matrix.T)    
+    
     return rot_cand_joints_3d
 
 def find_rigid_transform(A, B):

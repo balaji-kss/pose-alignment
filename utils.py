@@ -72,8 +72,8 @@ def get_segs():
     # v2_seg = [[100, 180], [225, 260], [260, 320], [360, 510]] # candidate
     
     # Lower_Galley_Carrier
-    v1_seg = [[31, 200], [240, 300]] # baseline
-    v2_seg = [[31, 145], [145, 185]] # candidate
+    # v1_seg = [[31, 200], [240, 300]] # baseline
+    # v2_seg = [[31, 120], [135, 185]] # candidate
 
     # Pushing_cart
     # v1_seg = [[60, 120]] # baseline
@@ -84,18 +84,18 @@ def get_segs():
     # v2_seg = [[57, 95], [110, 150], [155, 330]] # candidate
 
     # Serving_from_Basket
-    # v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
-    # v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+    v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
+    v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
 
     return v1_seg, v2_seg 
 
 def video_align():
 
     name = 'Lower_Galley_Carrier'
-    video_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/baseline.mov"
+    video_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/baseline_n.mov"
     pose_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/pose_3d.p"
 
-    video_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/candidate.mov"
+    video_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/candidate_n.mov"
     pose_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/pose_3d.p"
 
     # with open(pose_path1, 'rb') as f:
@@ -111,7 +111,7 @@ def video_align():
     v1_seg, v2_seg = get_segs()
 
     # Iterate through both videos
-    for i in range(len(v1_seg)):
+    for i in range(0, len(v1_seg)):
         
         bseg, cseg = normalize_segment(v1_seg[i], v2_seg[i]) # make sure the length of the segments are same
         print(len(bseg), len(cseg))
@@ -157,15 +157,16 @@ if __name__ == "__main__":
     ]
 
 
-    # # Index frames in a video and save it
-    # vname = 'candidate2'
-    # root_dir = '/home/tumeke-balaji/Documents/results/delta/joints/'
-    # input_video_path =  root_dir + vname + '/' + vname + '.mov'
-    # ext = input_video_path.rsplit('.', 1)[1]
-    # output_video_path = input_video_path.rsplit('.', 1)[0] + '_n.' + ext
-    # print('input_video_path ', input_video_path)
-    # print('output_video_path ', output_video_path)
-    # number_frames(input_video_path, output_video_path)
+    # Index frames in a video and save it
+    vname = 'candidate'
+    act_name = 'Lower_Galley_Carrier'
+    root_dir = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
+    input_video_path =  root_dir + vname + '/' + vname + '.mov'
+    ext = input_video_path.rsplit('.', 1)[1]
+    output_video_path = input_video_path.rsplit('.', 1)[0] + '_n.' + ext
+    print('input_video_path ', input_video_path)
+    print('output_video_path ', output_video_path)
+    number_frames(input_video_path, output_video_path)
 
     # check start and end of action for video alignment
     video_align()

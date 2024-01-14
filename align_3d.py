@@ -42,22 +42,22 @@ def draw_2d_skeletons_3d(frame, kpts_2d, color=(0, 0, 255), conf_thresh=0.35):
 
     return frame
 
-def plot_3d(ax, joints_2d, joints_3d_org, color, shiftx = 0.0):
+def plot_3d(ax, joints_2d, joints_3d_org, color, shiftx = 0.0, idxs = None):
 
     joints_3d = joints_3d_org.copy()
     joints_3d[:, 0] += shiftx
-    
+
     for connection in connections:
+        if idxs and connection[0] not in idxs and connection[1] not in idxs:continue
         if joints_2d[connection[0], 2] < conf_thresh or joints_2d[connection[1], 2] < conf_thresh: continue
         xs = [-joints_3d[connection[0], 0], -joints_3d[connection[1], 0]]
         ys = [joints_3d[connection[0], 1], joints_3d[connection[1], 1]]
         zs = [joints_3d[connection[0], 2], joints_3d[connection[1], 2]]
         ax.plot(xs, ys, zs, 'o-', color=color)
 
-def align_candidate_pose(base_3d_joints, cand_3d_joints):
+def align_candidate_pose_low(base_3d_joints, cand_3d_joints):
 
-    # base_joints_aligned, cand_joints_aligned, _ = procrustes(base_3d_joints, cand_3d_joints)
-    base_joints_aligned, cand_joints_aligned = base_3d_joints, cand_3d_joints
+    base_joints_aligned, cand_joints_aligned = base_3d_joints.copy(), cand_3d_joints.copy()
     # base_joints_aligned (17, 3)
     # cand_joints_aligned (17, 3)
 
@@ -69,9 +69,77 @@ def align_candidate_pose(base_3d_joints, cand_3d_joints):
 
     return base_joints_aligned, cand_joints_aligned
 
+def align_candidate_pose_up(base_3d_joints, cand_3d_joints):
+
+    base_joints_aligned, cand_joints_aligned = base_3d_joints.copy(), cand_3d_joints.copy()
+    # base_joints_aligned (17, 3)
+    # cand_joints_aligned (17, 3)
+
+    cand_joints_aligned = ca.align_shoulder(base_joints_aligned, cand_joints_aligned)
+    
+    base_joints_aligned[:, :] -= base_joints_aligned[7, :]
+    cand_joints_aligned[:, :] -= cand_joints_aligned[7, :]
+
+    return base_joints_aligned, cand_joints_aligned
+
+def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2):
+
+    base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
+
+    trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)
+
+    # lower body align
+    base_joints_aligned_low, cand_joints_aligned_low = align_candidate_pose_low(base_joints_3d, cand_joints_3d)
+
+    pad = 0.15
+    gminn, gmaxn = get_min_max(cand_joints_aligned_low)
+    ax2.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+    ax2.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+    ax2.set_zlim([gminn - pad, gmaxn + pad])
+
+    lthigh_dev = ca.get_left_thigh_dev(base_joints_aligned_low, cand_joints_aligned_low)
+
+    rthigh_dev = ca.get_right_thigh_dev(base_joints_aligned_low, cand_joints_aligned_low)
+
+    lleg_dev = ca.get_left_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
+
+    rleg_dev = ca.get_right_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
+
+    
+    low_idxs = list(range(0, 7))
+    plot_3d(ax2, bjoints_2d, base_joints_aligned_low, colors[0], shiftx=0.50, idxs = low_idxs)
+
+    plot_3d(ax2, cjoints_2d, cand_joints_aligned_low, colors[1], shiftx=0.50, idxs = low_idxs)
+
+    # upper body align
+    base_joints_aligned_up, cand_joints_aligned_up = align_candidate_pose_up(base_joints_3d, cand_joints_3d)
+
+    larm_dev = ca.get_left_arm_dev(base_joints_aligned_up, cand_joints_aligned_up)
+
+    rarm_dev = ca.get_right_arm_dev(base_joints_aligned_up, cand_joints_aligned_up)
+
+    lfarm_dev = ca.get_left_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
+
+    rfarm_dev = ca.get_right_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
+
+    up_idxs = list(range(11, 17))
+    plot_3d(ax2, bjoints_2d, base_joints_aligned_up, colors[0], shiftx=0.0, idxs = up_idxs)
+
+    plot_3d(ax2, cjoints_2d, cand_joints_aligned_up, colors[1], shiftx=0.0, idxs = up_idxs)
+
+    # vis_vector(ax2, base_joints_aligned_up)
+    # vis_vector(ax2, cand_joints_aligned_up)
+
+    return [trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
+
 def vis_vector(ax, joints_3d):
 
-    _, pts = ca.get_right_leg_vector(joints_3d)
+    _, pts = ca.get_right_forearm_vector(joints_3d)
+    s, e = pts
+
+    ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
+
+    _, pts = ca.get_right_arm_vector(joints_3d)
     s, e = pts
 
     ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
@@ -128,17 +196,9 @@ def render_poses_3d(video_lst, poses_3d_list):
 
             plot_3d(ax1, cjoints_2d, cjoints_3d, colors[1], shiftx=0.5)
 
-            bjoints_3d_align, cjoints_3d_align = align_candidate_pose(bjoints_3d, cjoints_3d)
+            trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = cal_dev(bjoints_3d, cjoints_3d, bjoints_2d, cjoints_2d, ax2)
 
-            plot_3d(ax2, bjoints_2d, bjoints_3d_align, colors[0], shiftx=0.0)
-
-            plot_3d(ax2, cjoints_2d, cjoints_3d_align, colors[1], shiftx=0.0)
-
-            # vis_vector(ax2, bjoints_3d_align)
-            # vis_vector(ax2, cjoints_3d_align)
-
-            trunk_dev, larm_dev, rarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = ca.calc_dev(bjoints_3d_align, cjoints_3d_align)
-            ax2.set_title(f"trunk: {trunk_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
+            ax2.set_title(f"trunk: {trunk_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
 
             frame1 = draw_2d_skeletons_3d(frame1, bjoints_2d, (0, 0, 255), conf_thresh = conf_thresh)
             frame1 = cv2.resize(frame1, None, fx=0.5, fy=0.5)
@@ -148,12 +208,6 @@ def render_poses_3d(video_lst, poses_3d_list):
             frame2 = cv2.resize(frame2, None, fx=0.5, fy=0.5)
             ax3.imshow(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
 
-            pad = 0.15
-            gminn, gmaxn = get_min_max(cjoints_3d_align)
-            ax2.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-            ax2.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-            ax2.set_zlim([gminn - pad, gmaxn + pad])
-
             pad = 0.0
             gminn, gmaxn = get_min_max(cjoints_3d)
             ax1.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
@@ -161,7 +215,7 @@ def render_poses_3d(video_lst, poses_3d_list):
             ax1.set_zlim([gminn - pad, gmaxn + pad])
 
             plt.tight_layout()
-            plt.pause(0.4)
+            plt.pause(0.0001)
 
 def draw_joints_2d(frame, joints_2d_hrnet, num_pts=18):
 
@@ -195,11 +249,11 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = 'Lower_Galley_Carrier'
+    act_name = 'Serving_from_Basket' # 'Pushing_cart' # 'Removing_Item_from_Bottom_of_Cart' # 'Lower_Galley_Carrier'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0
-    conf_thresh = 0.0
+    conf_thresh = 0.00
 
     video_lst, poses_2ds, poses_3ds = [], [], []
 
