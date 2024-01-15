@@ -31,16 +31,16 @@ jointMapping = {
 
 skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["Right hip", "Right shoulder"],
                    ["Right shoulder", "Right elbow"], ["Left shoulder", "Left elbow"], ["Right elbow", "Right wrist"],
-                   ["Left elbow", "Left wrist"], ["Left knee", "Left ankle"], ["Left shoulder", "Neck"],
-                   ["Neck", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
-                   ["Left hip", "Left knee"], ["Neck", "Head"]]
+                   ["Left elbow", "Left wrist"], ["Left knee", "Left ankle"], ["Left shoulder", "Thorax"],
+                   ["Thorax", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
+                   ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
 angle_bounds = {
-    'trunk': [[0, 7.5], [7.5, 15], [15, 22.5], [22.5, 30], [30, sys.maxsize]],
+    'trunk': [[0, 15], [15, 25], [25, 35], [35, 40], [40, sys.maxsize]],
     'arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],  
     'fore_arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],
-    'thigh': [[0, 7.5], [7.5, 15], [15, 22.5], [22.5, 30], [30, sys.maxsize]],
-    'leg': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],
+    'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
+    'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
 }
 
 colors = [[(0, 255, 0)], [(0, 255, 0), (0, 103, 255)], [(0, 103, 255)], [(0, 103, 255), (0, 0, 255)], [(0, 0, 255)]]
@@ -147,23 +147,85 @@ def drawSkeleton(frame, joints_2d, deviations, base=False, thresh=0.35):
         if base:color = (0, 255, 0)
         else: color = getColor(pair, deviations)
 
-        print('startPoint ', startPoint)
-        print('endPoint ', endPoint)
-        print('color ', color)
-
         frame = cv2.line(frame, startPoint, endPoint, color, get_skeleton_thickness(frame.shape))
     
     return frame
 
 def print_deviations(frame, deviations):
 
-    
+    trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
 
-def render_results(bvideo_path, cvideo_path, deviations_list):
+    start = 20
+    step = 30
+    frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (20, start), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA) 
+    y = start + step
+    frame = cv2.putText(frame, "Left arm: " + str(larm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 2 * step
+    frame = cv2.putText(frame, "Right arm: " + str(rarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 3 * step
+    frame = cv2.putText(frame, "Left Fore arm: " + str(lfarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 4 * step
+    frame = cv2.putText(frame, "Right Fore arm: " + str(rfarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 5 * step
+    frame = cv2.putText(frame, "Left thigh: " + str(lthigh_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 6 * step
+    frame = cv2.putText(frame, "Right thigh: " + str(rthigh_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 7 * step
+    frame = cv2.putText(frame, "Left Leg: " + str(lleg_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 8 * step
+    frame = cv2.putText(frame, "Right leg: " + str(rleg_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    
+    return frame
+
+def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh = 0.15):
+
+    for idx in idxs:
+        if bjoints_2d[idx, 2] < thresh or cjoints_2d[idx, 2] < thresh:
+            return 0.0
+        
+    return dev
+
+def mask_dev(deviations, bjoints_2d, cjoints_2d):
+
+    # NOTE: check mask for trunk
+
+    trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+
+    larm_dev = valid_dev(larm_dev, bjoints_2d, cjoints_2d, [11, 12])
+    rarm_dev = valid_dev(rarm_dev, bjoints_2d, cjoints_2d, [14, 15])
+
+    lfarm_dev = valid_dev(lfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13])
+    rfarm_dev = valid_dev(rfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13])
+
+    lthigh_dev = valid_dev(lthigh_dev, bjoints_2d, cjoints_2d, [4, 5])
+    rthigh_dev = valid_dev(rthigh_dev, bjoints_2d, cjoints_2d, [4, 5])
+
+    lleg_dev = valid_dev(lleg_dev, bjoints_2d, cjoints_2d, [4, 5, 6])
+    rleg_dev = valid_dev(rleg_dev, bjoints_2d, cjoints_2d, [1, 2, 3])
+
+    # larm_dev = max(larm_dev, rarm_dev)
+
+    return [trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
+
+def render_results(bvideo_path, cvideo_path, output_video_path, deviations_list):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
 
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # Define video writer
+    video_writer = cv2.VideoWriter(output_video_path,
+                                fourcc, cvideo.fps, (1080, 960))
+    
     v1_seg, v2_seg = utils.get_segs()
 
     # Iterate through both videos
@@ -181,29 +243,38 @@ def render_results(bvideo_path, cvideo_path, deviations_list):
             bjoints_2d = deviations_list[gidx]['bjoints_2d']
             cjoints_2d = deviations_list[gidx]['cjoints_2d']
             deviations = deviations_list[gidx]['deviations']
+            print('deviations ', deviations)
+            deviations = mask_dev(deviations, bjoints_2d, cjoints_2d)
 
             bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=0.35)
+
+            cframe = print_deviations(cframe, deviations)
             cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=0.35)
 
             bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
             cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
 
             gidx += 1
-
+            concat = np.hstack((bframe, cframe))
+            print('concat ', concat.shape)
+            video_writer.write(concat)
             cv2.imshow('Baseline ', bframe)
             cv2.imshow('Candidate ', cframe)
             cv2.waitKey(-1)
 
+    video_writer.release()
+
 if __name__ == "__main__":
 
-    act_name = 'Serving_from_Basket' # 'Pushing_cart' # 'Removing_Item_from_Bottom_of_Cart' # 'Lower_Galley_Carrier'
+    act_name = 'Pushing_cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'    
 
     bvideo_path = root_pose + '/baseline/baseline.mov'
     cvideo_path = root_pose + '/candidate/candidate.mov'
+    out_video_path = root_pose + act_name + '.mov'
     deviation_path = root_pose + 'deviations.pkl'
     
     with open(deviation_path, 'rb') as f:
         deviations = pickle.load(f)
 
-    render_results(bvideo_path, cvideo_path, deviations)
+    render_results(bvideo_path, cvideo_path, out_video_path, deviations)

@@ -1,6 +1,11 @@
 import numpy as np
 
 def _normalize(vec):
+
+    den = np.linalg.norm(vec)
+
+    if den == 0: return np.array([0.0, 0.0, 0.0])
+
     return vec / np.linalg.norm(vec)
 
 def get_trunk_vector(joints_3d):
@@ -269,56 +274,3 @@ def align_shoulder(base_joints_3d, cand_joints_3d):
     rot_cand_joints_3d = np.dot(cand_joints_3d, rotation_matrix.T)    
     
     return rot_cand_joints_3d
-
-def find_rigid_transform(A, B):
-    # Ensure the point sets have the same size
-    assert A.shape == B.shape
-    
-    # Calculate centroids
-    centroid_A = np.mean(A, axis=0)
-    centroid_B = np.mean(B, axis=0)
-
-    # Center the points
-    A_centered = A - centroid_A
-    B_centered = B - centroid_B
-
-    # Compute cross-covariance matrix
-    H = A_centered.T @ B_centered
-
-    # Compute rotation using SVD
-    U, _, Vt = np.linalg.svd(H)
-    R = Vt.T @ U.T
-
-    # Ensure a proper right-handed coordinate system
-    if np.linalg.det(R) < 0:
-        Vt[-1, :] *= -1
-        R = Vt.T @ U.T
-
-    # Compute translation
-    t = centroid_A - R @ centroid_B
-
-    # Construct transformation matrix
-    transform_matrix = np.identity(4)
-    transform_matrix[:3, :3] = R
-    transform_matrix[:3, 3] = t
-
-    return transform_matrix
-
-def apply_transformation_to_pose(pose, transformation_matrix):
-    """
-    Apply a transformation matrix to all joints in a 3D pose.
-
-    :param pose: A numpy array of shape (num_joints, 3) representing the 3D pose.
-    :param transformation_matrix: A 4x4 numpy array representing the transformation matrix.
-    :return: Transformed pose as a numpy array of shape (num_joints, 3).
-    """
-    # Convert pose to homogeneous coordinates
-    num_joints = pose.shape[0]
-    homogeneous_pose = np.hstack((pose, np.ones((num_joints, 1))))
-
-    # Apply transformation
-    transformed_pose = np.dot(homogeneous_pose, transformation_matrix.T)
-
-    # Convert back to 3D coordinates
-    transformed_pose = transformed_pose[:, :3]
-    return transformed_pose

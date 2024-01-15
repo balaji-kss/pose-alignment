@@ -76,16 +76,16 @@ def get_segs():
     # v2_seg = [[31, 120], [135, 185]] # candidate
 
     # Pushing_cart
-    # v1_seg = [[60, 120]] # baseline
-    # v2_seg = [[60, 100]] # candidate
+    v1_seg = [[60, 120]] # baseline
+    v2_seg = [[60, 100]] # candidate
 
     # Removing_Item_from_Bottom_of_Cart
     # v1_seg = [[5, 55], [55, 100], [125, 270]] # baseline
     # v2_seg = [[57, 95], [110, 150], [155, 330]] # candidate
 
     # Serving_from_Basket
-    v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
-    v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+    # v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
+    # v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
 
     return v1_seg, v2_seg 
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
 
     # Index frames in a video and save it
-    vname = 'candidate'
+    vname = 'baseline'
     act_name = 'Lower_Galley_Carrier'
     root_dir = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
     input_video_path =  root_dir + vname + '/' + vname + '.mov'
@@ -169,4 +169,4 @@ if __name__ == "__main__":
     number_frames(input_video_path, output_video_path)
 
     # check start and end of action for video alignment
-    video_align()
+    # video_align()

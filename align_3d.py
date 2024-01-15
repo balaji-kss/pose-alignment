@@ -86,7 +86,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
-    trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)
+    trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)   
 
     # lower body align
     base_joints_aligned_low, cand_joints_aligned_low = align_candidate_pose_low(base_joints_3d, cand_joints_3d)
@@ -95,7 +95,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
     gminn, gmaxn = get_min_max(cand_joints_aligned_low)
     ax2.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
     ax2.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-    ax2.set_zlim([gminn - pad, gmaxn + pad])
+    ax2.set_zlim([gminn - pad, gmaxn + pad])            
 
     lthigh_dev = ca.get_left_thigh_dev(base_joints_aligned_low, cand_joints_aligned_low)
 
@@ -228,7 +228,8 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, save_out_pkl, vis=
                 ax1.set_zlim([gminn - pad, gmaxn + pad])
 
                 plt.tight_layout()
-                plt.pause(0.0001)
+                plt.pause(0.1)
+                # plt.show()
 
     with open(save_out_pkl, 'wb') as f:
         pickle.dump(deviations_lst, f)
@@ -265,11 +266,11 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = 'Serving_from_Basket' # 'Pushing_cart' # 'Removing_Item_from_Bottom_of_Cart' # 'Lower_Galley_Carrier'
+    act_name = 'Pushing_cart' #'Removing_Item_from_Bottom_of_Cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0
-    conf_thresh = 0.00
+    conf_thresh = 0.35
 
     video_lst, poses_2ds, poses_3ds = [], [], []
 
@@ -296,4 +297,4 @@ if __name__ == "__main__":
 
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
-    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, out_pkl, vis=False)
+    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, out_pkl, vis=True)
