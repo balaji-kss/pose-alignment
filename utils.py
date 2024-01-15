@@ -72,12 +72,12 @@ def get_segs():
     # v2_seg = [[100, 180], [225, 260], [260, 320], [360, 510]] # candidate
     
     # Lower_Galley_Carrier
-    # v1_seg = [[31, 200], [240, 300]] # baseline
-    # v2_seg = [[31, 120], [135, 185]] # candidate
+    v1_seg = [[31, 200], [240, 300]] # baseline
+    v2_seg = [[31, 120], [135, 185]] # candidate
 
     # Pushing_cart
-    v1_seg = [[60, 120]] # baseline
-    v2_seg = [[60, 100]] # candidate
+    # v1_seg = [[60, 120]] # baseline
+    # v2_seg = [[60, 100]] # candidate
 
     # Removing_Item_from_Bottom_of_Cart
     # v1_seg = [[5, 55], [55, 100], [125, 270]] # baseline
