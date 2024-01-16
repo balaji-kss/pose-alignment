@@ -48,36 +48,33 @@ def match_range(bvideo, cvideo, bidx, crange, bpose, cpose, vis=False):
         cand_joints_3d_org = cpose[cidx][0]['keypoints_3d']
         base_joints_3d = base_joints_3d_org.copy()
         cand_joints_3d = cand_joints_3d_org.copy()
-        # base_joints_3d, cand_joints_3d, disparity = procrustes(base_joints_3d, cand_joints_3d)
         R, _ = orthogonal_procrustes(cand_joints_3d, base_joints_3d)
         cand_joints_3d = cand_joints_3d @ R
 
-        plot_3d(ax1, base_joints_3d, 'red', shiftx = 0.0, idxs = None)
-        plot_3d(ax1, cand_joints_3d, 'green', shiftx = 0.0, idxs = None)
-        # plot_3d(ax1, cand_joints_3d_org, 'green', shiftx = 0.25, idxs = None)
-
-        pad = 0.5
-        gminn, gmaxn = get_min_max(cand_joints_3d)
-        ax1.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-        ax1.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-        ax1.set_zlim([gminn - pad, gmaxn + pad])
-        
-        # base_joints_3d[[0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]] = 0.0
-        # cand_joints_3d[[0, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]] = 0.0
         val = np.sum((base_joints_3d - cand_joints_3d) ** 2)
 
-        cframe = cvideo[cidx]
-    
-        concat = np.hstack((bframe, cframe))
-        concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
-        # print(cidx, round(disparity, 3), round(val, 3))
-        print(cidx, round(val, 3))
-        # cv2.imshow('concat ', concat)
-        # cv2.waitKey(-1)
+        if vis:
+            plot_3d(ax1, base_joints_3d, 'red', shiftx = 0.0, idxs = None)
+            plot_3d(ax1, cand_joints_3d, 'green', shiftx = 0.0, idxs = None)
 
-        ax.imshow(cv2.cvtColor(concat, cv2.COLOR_BGR2RGB))
-        plt.tight_layout()
-        plt.pause(0.0001)
+            pad = 0.5
+            gminn, gmaxn = get_min_max(cand_joints_3d)
+            ax1.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+            ax1.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+            ax1.set_zlim([gminn - pad, gmaxn + pad])
+            
+            cframe = cvideo[cidx]
+        
+            concat = np.hstack((bframe, cframe))
+            concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
+            # print(cidx, round(disparity, 3), round(val, 3))
+            print(cidx, round(val, 3))
+            # cv2.imshow('concat ', concat)
+            # cv2.waitKey(-1)
+
+            ax.imshow(cv2.cvtColor(concat, cv2.COLOR_BGR2RGB))
+            plt.tight_layout()
+            plt.pause(0.0001)
         
 if __name__ == "__main__":
 
