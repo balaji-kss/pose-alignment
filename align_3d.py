@@ -76,9 +76,12 @@ def align_candidate_pose_up(base_3d_joints, cand_3d_joints):
     # cand_joints_aligned (17, 3)
 
     cand_joints_aligned = ca.align_shoulder(base_joints_aligned, cand_joints_aligned)
-    
-    base_joints_aligned[:, :] -= base_joints_aligned[7, :]
-    cand_joints_aligned[:, :] -= cand_joints_aligned[7, :]
+
+    bmid_shoulder = 0.5 * (base_joints_aligned[11, :] + base_joints_aligned[14, :])
+    cmid_shoulder = 0.5 * (cand_joints_aligned[11, :] + cand_joints_aligned[14, :])
+
+    base_joints_aligned[:, :] -= bmid_shoulder
+    cand_joints_aligned[:, :] -= cmid_shoulder
 
     return base_joints_aligned, cand_joints_aligned
 
@@ -86,7 +89,15 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
+    if vis:
+        plot_3d(ax2, bjoints_2d, base_joints_3d, colors[0], shiftx=0.25)
+        plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.45)
+
+        vis_vector(ax2, base_joints_3d, shiftx=0.25)
+        vis_vector(ax2, cand_joints_3d, shiftx=0.45)
+        
     trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)   
+    trunk_twist_dev = ca.get_trunk_twist_dev(base_joints_3d, cand_joints_3d)   
 
     # lower body align
     base_joints_aligned_low, cand_joints_aligned_low = align_candidate_pose_low(base_joints_3d, cand_joints_3d)
@@ -111,6 +122,9 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
         plot_3d(ax2, cjoints_2d, cand_joints_aligned_low, colors[1], shiftx=0.50, idxs = low_idxs)
 
+        vis_vector(ax2, base_joints_aligned_low, shiftx=0.5)
+        vis_vector(ax2, cand_joints_aligned_low, shiftx=0.5)
+
     # upper body align
     base_joints_aligned_up, cand_joints_aligned_up = align_candidate_pose_up(base_joints_3d, cand_joints_3d)
 
@@ -128,13 +142,15 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
         plot_3d(ax2, cjoints_2d, cand_joints_aligned_up, colors[1], shiftx=0.0, idxs = up_idxs)
 
-    # vis_vector(ax2, base_joints_aligned_up)
-    # vis_vector(ax2, cand_joints_aligned_up)
+        vis_vector(ax2, base_joints_aligned_up, shiftx=0.0)
+        vis_vector(ax2, cand_joints_aligned_up, shiftx=0.0)
 
-    return [trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
+    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
 
-def vis_vector(ax, joints_3d):
+def vis_vector(ax, joints_3d_org, shiftx=0.0):
 
+    joints_3d = joints_3d_org.copy()
+    joints_3d[:, 0] += shiftx
     _, pts = ca.get_right_forearm_vector(joints_3d)
     s, e = pts
 
@@ -210,8 +226,8 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, save_out_pkl, vis=
             deviations_lst.append({'deviations':deviations, 'cjoints_2d':csjoints_2d, 'bjoints_2d':bsjoints_2d})
 
             if vis:
-                trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
-                ax2.set_title(f"trunk: {trunk_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
+                trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+                ax2.set_title(f"trunk: {trunk_dev} \n trunk twist: {trunk_twist_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
 
                 frame1 = draw_2d_skeletons_3d(frame1, bjoints_2d, (0, 0, 255), conf_thresh = conf_thresh)
                 frame1 = cv2.resize(frame1, None, fx=0.5, fy=0.5)
@@ -227,8 +243,13 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, save_out_pkl, vis=
                 ax1.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
                 ax1.set_zlim([gminn - pad, gmaxn + pad])
 
+                ax2.set_xlabel('X')
+                ax2.set_ylabel('Y')
+                ax2.set_zlabel('Z')
+
                 plt.tight_layout()
-                plt.pause(0.1)
+                # plt.pause(0.00001)
+                plt.pause(1)
                 # plt.show()
 
     with open(save_out_pkl, 'wb') as f:
@@ -266,7 +287,7 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = 'Pushing_cart' #'Removing_Item_from_Bottom_of_Cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
+    act_name = 'Serving_from_Basket' #'Removing_Item_from_Bottom_of_Cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0

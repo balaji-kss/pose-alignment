@@ -83,8 +83,8 @@ def get_segs():
     # v2_seg = [[100, 180], [225, 260], [260, 320], [360, 510]] # candidate
     
     # Lower_Galley_Carrier
-    v1_seg = [[31, 200], [240, 300]] # baseline
-    v2_seg = [[31, 120], [135, 185]] # candidate
+    # v1_seg = [[31, 200], [240, 300]] # baseline
+    # v2_seg = [[31, 120], [135, 185]] # candidate
 
     # Pushing_cart
     # v1_seg = [[60, 120]] # baseline
@@ -95,8 +95,8 @@ def get_segs():
     # v2_seg = [[57, 95], [110, 150], [155, 330]] # candidate
 
     # Serving_from_Basket
-    # v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
-    # v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+    v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
+    v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
 
     return v1_seg, v2_seg 
 

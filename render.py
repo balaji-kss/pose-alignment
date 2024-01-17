@@ -266,7 +266,7 @@ def render_results(bvideo_path, cvideo_path, output_video_path, deviations_list)
 
 if __name__ == "__main__":
 
-    act_name = 'Pushing_cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
+    act_name = 'Serving_from_Basket' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'    
 
     bvideo_path = root_pose + '/baseline/baseline.mov'
