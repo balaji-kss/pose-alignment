@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import pickle
 import render 
+import json
 
 def number_frames():
 
@@ -74,75 +75,93 @@ def normalize_segment(bsegment, csegment):
         new_cids = pick_equidistant_elements(cids, req_len)
         new_bids = bids
 
-    return new_bids, new_cids
+    new_bids = np.expand_dims(new_bids, axis=1)
+    new_cids = np.expand_dims(new_cids, axis=1)
 
-def get_segs():
+    pair_lst = np.hstack((new_bids, new_cids))
 
-    # Stowing_carrier
-    # v1_seg = [[60, 137], [140, 172], [175, 260], [280, 385]] # baseline
-    # v2_seg = [[100, 180], [225, 260], [260, 320], [360, 510]] # candidate
+    return pair_lst.tolist()
+
+def get_segs(vname):
+
+    if vname == "Stowing_carrier":
+        v1_seg = [[60, 137], [140, 172], [175, 260], [280, 385]] # baseline
+        v2_seg = [[100, 180], [225, 260], [260, 320], [360, 510]] # candidate
+        return v1_seg, v2_seg
     
-    # Lower_Galley_Carrier
-    # v1_seg = [[31, 200], [240, 300]] # baseline
-    # v2_seg = [[31, 120], [135, 185]] # candidate
+    if vname == "Lower_Galley_Carrier":
+        v1_seg = [[31, 200], [240, 300]] # baseline
+        v2_seg = [[31, 120], [135, 185]] # candidate
+        return v1_seg, v2_seg
+    
+    if vname == "Pushing_cart":
+        v1_seg = [[60, 120]] # baseline
+        v2_seg = [[60, 100]] # candidate
+        return v1_seg, v2_seg
+    
+    if vname == "Removing_Item_from_Bottom_of_Cart":
+        v1_seg = [[5, 55], [55, 100], [125, 270]] # baseline
+        v2_seg = [[57, 95], [110, 150], [155, 330]] # candidate
+        return v1_seg, v2_seg
+    
+    if vname == "Serving_from_Basket":
+        v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
+        v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+        return v1_seg, v2_seg 
 
-    # Pushing_cart
-    # v1_seg = [[60, 120]] # baseline
-    # v2_seg = [[60, 100]] # candidate
+def manual_video_align(vname):
 
-    # Removing_Item_from_Bottom_of_Cart
-    # v1_seg = [[5, 55], [55, 100], [125, 270]] # baseline
-    # v2_seg = [[57, 95], [110, 150], [155, 330]] # candidate
+    v1_seg, v2_seg = get_segs(vname)
 
-    # Serving_from_Basket
-    v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
-    v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+    fpairs = []
+    for i in range(len(v1_seg)):
 
-    return v1_seg, v2_seg 
+        pair_lst = normalize_segment(v1_seg[i], v2_seg[i])
+        fpairs += pair_lst
+    
+    return fpairs
+
+def pose_embed_video_align(align_path):
+
+    with open(align_path, 'r') as file:
+        pairs = json.load(file)
+
+    pairs_np = np.array(pairs)
+    align_ids = pairs_np[:, -1]
+    indices = np.where(align_ids == 1)[0]
+    align_pairs = pairs_np[indices][:, :2].astype('int')
+
+    return align_pairs.tolist()
 
 def video_align():
 
-    name = 'Lower_Galley_Carrier'
+    name = 'Removing_Item_from_Bottom_of_Cart'
     video_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/baseline_n.mov"
-    pose_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/pose_3d.p"
-
     video_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/candidate_n.mov"
-    pose_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/pose_3d.p"
-
-    # with open(pose_path1, 'rb') as f:
-    #     pose_3d1 = pickle.load(f)
-
-    # with open(pose_path2, 'rb') as f:
-    #     pose_3d2 = pickle.load(f)
-
+    align_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/" + name + "/baseline_candidate-dtw_path.json"
     # Load videos
     video1 = mmcv.VideoReader(video_path1)
     video2 = mmcv.VideoReader(video_path2)
 
-    v1_seg, v2_seg = get_segs()
+    path_pairs = pose_embed_video_align(align_path)
 
     # Iterate through both videos
-    for i in range(0, len(v1_seg)):
+    for t, (b, c) in enumerate(path_pairs):
+
+        frame1 = video1[b]
+        frame2 = video2[c]
+
+        # joints_2d1 = pose_3d1[s1 + i][0]['keypoints']
+        # joints_2d2 = pose_3d2[s2 + i][0]['keypoints']
         
-        bseg, cseg = normalize_segment(v1_seg[i], v2_seg[i]) # make sure the length of the segments are same
-        print(len(bseg), len(cseg))
-
-        for b, c in zip(bseg, cseg):
-
-            frame1 = video1[b]
-            frame2 = video2[c]
-
-            # joints_2d1 = pose_3d1[s1 + i][0]['keypoints']
-            # joints_2d2 = pose_3d2[s2 + i][0]['keypoints']
-            
-            # frame1 = draw_2d_skeletons_3d(frame1, joints_2d1, conf_thresh = 0.35)
-            # frame2 = draw_2d_skeletons_3d(frame2, joints_2d2, (255, 0, 0), 0.35)
-            
-            frame1 = cv2.resize(frame1, None, fx = 0.5, fy = 0.5)
-            frame2 = cv2.resize(frame2, None, fx = 0.5, fy = 0.5)
-            cv2.imshow('Baseline ', frame1)
-            cv2.imshow('Candidate ', frame2)
-            cv2.waitKey(-1)
+        # frame1 = draw_2d_skeletons_3d(frame1, joints_2d1, conf_thresh = 0.35)
+        # frame2 = draw_2d_skeletons_3d(frame2, joints_2d2, (255, 0, 0), 0.35)
+        
+        frame1 = cv2.resize(frame1, None, fx = 0.5, fy = 0.5)
+        frame2 = cv2.resize(frame2, None, fx = 0.5, fy = 0.5)
+        cv2.imshow('Baseline ', frame1)
+        cv2.imshow('Candidate ', frame2)
+        cv2.waitKey(-1)
         
 def render_entire_video():
     
@@ -257,8 +276,8 @@ if __name__ == "__main__":
     # number_frames()
 
     # check start and end of action for video alignment
-    # video_align()
+    video_align()
 
     # render_entire_video()
 
-    merge_videos()
+    # merge_videos()

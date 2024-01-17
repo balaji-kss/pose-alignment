@@ -147,13 +147,17 @@ def apply_average_filter(matrix, kernel_size):
     
     return filtered_matrix
 
-def get_matching(bvideo, cvideo, bposes_3d, cposes_3d):
+def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
 
     dist_mat = dist_matrix(bvideo, cvideo, bposes_3d, cposes_3d)
     dist_mat = np.array(dist_mat)
     print(len(bvideo), len(cvideo))
     print('dist_mat shape ', dist_mat.shape)
 
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(out_video_path,
+                                fourcc, cvideo.fps, (1080, 960))
+    
     # dist_mat_avg = apply_average_filter(dist_mat, kernel_size = 9)
     dist_mat_avg = dist_mat
     # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -181,21 +185,25 @@ def get_matching(bvideo, cvideo, bposes_3d, cposes_3d):
         cframe = cvideo[c]
 
         print(b, c, dist)
-        cv2.putText(cframe, str(dist), (250, 40), 
+        cv2.putText(cframe, 'PMPJPE: ' + str(dist), (250, 40), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         concat = np.hstack((bframe, cframe))
         concat = cv2.resize(concat, None, fx=0.5, fy=0.5)
-        
+        video_writer.write(concat)
+        print('concat shape ', concat.shape)
         cv2.imshow('concat ', concat)
         cv2.waitKey(-1)
 
+    video_writer.release()
+
 if __name__ == "__main__":
 
-    act_name =  'Removing_Item_from_Bottom_of_Cart' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
+    act_name =  'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
     root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'    
 
     bvideo_path = root_pose + '/baseline/baseline_n.mov'
     cvideo_path = root_pose + '/candidate/candidate_n.mov'
+    out_video_path = root_pose + act_name + '_align.mov'
 
     bpose_path_3d = "/home/tumeke-balaji/Documents/results/delta/joints/" + act_name + "/baseline/pose_3d.p"
     cpose_path_3d = "/home/tumeke-balaji/Documents/results/delta/joints/" + act_name + "/candidate/pose_3d.p"
@@ -230,4 +238,4 @@ if __name__ == "__main__":
     with open(cpose_path_3d, 'rb') as f:
         cposes_3d = pickle.load(f)
 
-    get_matching(bvideo, cvideo, bposes_3d, cposes_3d)
+    get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d)
