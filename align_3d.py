@@ -248,8 +248,8 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, save_out_pkl, vis=
                 ax2.set_zlabel('Z')
 
                 plt.tight_layout()
-                # plt.pause(0.00001)
-                plt.pause(1)
+                plt.pause(0.00001)
+                # plt.pause(1)
                 # plt.show()
 
     with open(save_out_pkl, 'wb') as f:
