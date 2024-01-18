@@ -37,8 +37,8 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
                    ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
 angle_bounds = {
-    'trunk': [[0, 15], [15, 25], [25, 35], [35, 40], [40, sys.maxsize]],
-    'arm': [[0, 25], [25, 50], [50, 75], [75, 90], [90, sys.maxsize]],  
+    'trunk': [[0, 10], [10, 20], [20, 30], [30, 45], [45, sys.maxsize]],
+    'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
     'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
     'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
     'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
@@ -102,17 +102,18 @@ def getColor(joints, deviations):
         joints == ["Right hip", "Right shoulder"]):
         angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
         return get_color_helper("trunk", angle)
+    
     if (joints == ["Right shoulder", "Right elbow"]):
         angle = deviations[3]
-        return get_color_helper("trunk", angle)
+        return get_color_helper("arm", angle)
     if (joints == ["Left shoulder", "Left elbow"]):
         angle = deviations[2]
         return get_color_helper("arm", angle)
-    if (joints == ["Left elbow", "Left wrist"]):
-        angle = deviations[4]
-        return get_color_helper("fore_arm", angle)
     if (joints == ["Right elbow", "Right wrist"]):
         angle = deviations[5]
+        return get_color_helper("fore_arm", angle)
+    if (joints == ["Left elbow", "Left wrist"]):
+        angle = deviations[4]
         return get_color_helper("fore_arm", angle)
     
     if (joints == ["Right hip", "Right knee"]):

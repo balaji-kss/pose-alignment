@@ -323,8 +323,8 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = "Stowing_carrier"
-    # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
+    act_name = "Serving_from_Basket"
+    # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/' + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
     output_video_path = root_pose + act_name + '_dev.mov'
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
 
-    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
+    # align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=True)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)

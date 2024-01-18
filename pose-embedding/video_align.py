@@ -139,7 +139,7 @@ def cross_sim_video_align():
     task_path = input_dir
 
     template_name  = "baseline" # "baseline-IMG_0032" # "baseline"
-    candidate_name = "candidate1" # "candidate-IMG_0033" # "candidate-good"
+    candidate_name = "candidate" # "candidate-IMG_0033" # "candidate-good"
     pose_win_sec = 0.3  #pose_win_sec=0.3
     distance_np, dtw_path = csva.cross_video_alignment(template_name, candidate_name, task_path, scalar_parameters, pose_embedding_folder, pose_folder, normal_folder, device, pose_win_sec=pose_win_sec)
     categorized_path = csva.generate_aligned_unaligned_path(template_name, candidate_name, distance_np, dtw_path, pose_embedding_folder, pose_win_sec=pose_win_sec)
@@ -149,12 +149,20 @@ def cross_sim_video_align():
 
     return categorized_path
 
+def list_subdirs(directory_path):
+    subdirs = [os.path.join(directory_path, d) for d in os.listdir(directory_path) 
+               if os.path.isdir(os.path.join(directory_path, d))]
+    return subdirs
+
 if __name__ == "__main__":
 
-    name = "Stowing_carrier" #  # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
-    input_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/" + name + "/"
+    root_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/"
+    input_dirs = list_subdirs(root_dir) # "Serving_from_Basket" #  # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     gpu_id = 0
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
-    embedder_fn, scalar_parameters = get_embed_fn()
-    # extract_save_embedding(input_dir, embedder_fn, scalar_parameters)
-    cross_sim_video_align()
+
+    for input_dir in input_dirs:
+        print('input_dir ', input_dir)
+        embedder_fn, scalar_parameters = get_embed_fn()
+        extract_save_embedding(input_dir, embedder_fn, scalar_parameters)
+        cross_sim_video_align()
