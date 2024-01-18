@@ -1,2 +1,2 @@
-# Pose-alignment
-frame-wise 3d pose align
+# delta
+delta 3d pose align

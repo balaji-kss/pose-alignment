@@ -5,6 +5,7 @@ import coloring
 import mmcv
 import utils
 import pickle
+import math
 
 jointMapping = {
     "Neck": 9,
@@ -37,8 +38,8 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
 
 angle_bounds = {
     'trunk': [[0, 15], [15, 25], [25, 35], [35, 40], [40, sys.maxsize]],
-    'arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],  
-    'fore_arm': [[0, 15], [15, 30], [30, 40], [40, 50], [50, sys.maxsize]],
+    'arm': [[0, 25], [25, 50], [50, 75], [75, 90], [90, sys.maxsize]],  
+    'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
     'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
     'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
 }
@@ -99,30 +100,36 @@ def getColor(joints, deviations):
     if (joints == ["Left hip", "Left shoulder"] or \
         joints == ["Right hip", "Left hip"] or \
         joints == ["Right hip", "Right shoulder"]):
-        return get_color_helper(0, "trunk", deviations)
+        angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
+        return get_color_helper("trunk", angle)
     if (joints == ["Right shoulder", "Right elbow"]):
-        return get_color_helper(2, "arm", deviations)
+        angle = deviations[3]
+        return get_color_helper("trunk", angle)
     if (joints == ["Left shoulder", "Left elbow"]):
-        return get_color_helper(1, "arm", deviations)
+        angle = deviations[2]
+        return get_color_helper("arm", angle)
     if (joints == ["Left elbow", "Left wrist"]):
-        return get_color_helper(3, "fore_arm", deviations)
+        angle = deviations[4]
+        return get_color_helper("fore_arm", angle)
     if (joints == ["Right elbow", "Right wrist"]):
-        return get_color_helper(4, "fore_arm", deviations)
+        angle = deviations[5]
+        return get_color_helper("fore_arm", angle)
     
     if (joints == ["Right hip", "Right knee"]):
-        return get_color_helper(6, "thigh", deviations)
+        angle = deviations[7]
+        return get_color_helper("thigh", angle)
     if (joints == ["Left hip", "Left knee"]):
-        return get_color_helper(5, "thigh", deviations)
+        angle = deviations[6]
+        return get_color_helper("thigh", angle)
     if (joints == ["Right knee", "Right ankle"]):
-        return get_color_helper(8, "leg", deviations)
+        return get_color_helper("leg", deviations[9])
     if (joints == ["Left knee", "Left ankle"]):
-        return get_color_helper(7, "leg", deviations)
+        return get_color_helper("leg", deviations[8])
     
     return (0, 255, 0)
 
-def get_color_helper(id_, joint_name, deviations):
+def get_color_helper(joint_name, angle):
     
-    angle = deviations[id_]
     color = coloring.get_color(joint_name, angle_bounds, angle, colors)
 
     return color
@@ -153,40 +160,44 @@ def drawSkeleton(frame, joints_2d, deviations, base=False, thresh=0.35):
 
 def print_deviations(frame, deviations):
 
-    trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
 
-    start = 20
+    start = 40
     step = 30
-    frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (20, start), cv2.FONT_HERSHEY_SIMPLEX,  
+    w = 700
+    frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (w, start), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA) 
     y = start + step
-    frame = cv2.putText(frame, "Left arm: " + str(larm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    frame = cv2.putText(frame, "Trunk Twist: " + str(trunk_twist_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA) 
     y = start + 2 * step
-    frame = cv2.putText(frame, "Right arm: " + str(rarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Left arm: " + str(larm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 3 * step
-    frame = cv2.putText(frame, "Left Fore arm: " + str(lfarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    frame = cv2.putText(frame, "Right arm: " + str(rarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                  1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 4 * step
-    frame = cv2.putText(frame, "Right Fore arm: " + str(rfarm_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Left Fore arm: " + str(lfarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 5 * step
-    frame = cv2.putText(frame, "Left thigh: " + str(lthigh_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Right Fore arm: " + str(rfarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 6 * step
-    frame = cv2.putText(frame, "Right thigh: " + str(rthigh_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Left thigh: " + str(lthigh_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 7 * step
-    frame = cv2.putText(frame, "Left Leg: " + str(lleg_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Right thigh: " + str(rthigh_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     y = start + 8 * step
-    frame = cv2.putText(frame, "Right leg: " + str(rleg_dev), (20, y), cv2.FONT_HERSHEY_SIMPLEX,  
+    frame = cv2.putText(frame, "Left Leg: " + str(lleg_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 1, cv2.LINE_AA)
+    y = start + 9 * step
+    frame = cv2.putText(frame, "Right leg: " + str(rleg_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     
     return frame
 
-def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh = 0.15):
+def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh = 0.35):
 
     for idx in idxs:
         if bjoints_2d[idx, 2] < thresh or cjoints_2d[idx, 2] < thresh:
@@ -194,29 +205,28 @@ def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh = 0.15):
         
     return dev
 
-def mask_dev(deviations, bjoints_2d, cjoints_2d):
+def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
 
     # NOTE: check mask for trunk
+    # NOTE: get neck angle
 
-    trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
 
-    larm_dev = valid_dev(larm_dev, bjoints_2d, cjoints_2d, [11, 12])
-    rarm_dev = valid_dev(rarm_dev, bjoints_2d, cjoints_2d, [14, 15])
+    larm_dev = valid_dev(larm_dev, bjoints_2d, cjoints_2d, [11, 12], thresh=thresh)
+    rarm_dev = valid_dev(rarm_dev, bjoints_2d, cjoints_2d, [14, 15], thresh=thresh)
 
-    lfarm_dev = valid_dev(lfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13])
-    rfarm_dev = valid_dev(rfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13])
+    lfarm_dev = valid_dev(lfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13], thresh=thresh)
+    rfarm_dev = valid_dev(rfarm_dev, bjoints_2d, cjoints_2d, [14, 15, 16], thresh=thresh)
 
-    lthigh_dev = valid_dev(lthigh_dev, bjoints_2d, cjoints_2d, [4, 5])
-    rthigh_dev = valid_dev(rthigh_dev, bjoints_2d, cjoints_2d, [4, 5])
+    lthigh_dev = valid_dev(lthigh_dev, bjoints_2d, cjoints_2d, [4, 5], thresh=thresh)
+    rthigh_dev = valid_dev(rthigh_dev, bjoints_2d, cjoints_2d, [1, 2], thresh=thresh)
+    
+    lleg_dev = valid_dev(lleg_dev, bjoints_2d, cjoints_2d, [4, 5, 6], thresh=thresh)
+    rleg_dev = valid_dev(rleg_dev, bjoints_2d, cjoints_2d, [1, 2, 3], thresh=thresh)
 
-    lleg_dev = valid_dev(lleg_dev, bjoints_2d, cjoints_2d, [4, 5, 6])
-    rleg_dev = valid_dev(rleg_dev, bjoints_2d, cjoints_2d, [1, 2, 3])
+    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
 
-    # larm_dev = max(larm_dev, rarm_dev)
-
-    return [trunk_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
-
-def render_results(bvideo_path, cvideo_path, output_video_path, deviations_list):
+def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviations_list, thresh):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
@@ -225,41 +235,41 @@ def render_results(bvideo_path, cvideo_path, output_video_path, deviations_list)
     # Define video writer
     video_writer = cv2.VideoWriter(output_video_path,
                                 fourcc, cvideo.fps, (1080, 960))
-    
-    v1_seg, v2_seg = utils.get_segs()
+
 
     # Iterate through both videos
-    gidx = 0
-    for i in range(len(v1_seg)):
-        
-        bseg, cseg = utils.normalize_segment(v1_seg[i], v2_seg[i]) # make sure the length of the segments are same
-        print(len(bseg), len(cseg))
+    for t, (b, c, isalign) in enumerate(path_ids):
 
-        for b, c in zip(bseg, cseg):
+            bframe = bvideo[b].copy()
+            cframe = cvideo[c].copy()  
 
-            bframe = bvideo[b]
-            cframe = cvideo[c]  
+            bjoints_2d = deviations_list[t]['bjoints_2d']
+            cjoints_2d = deviations_list[t]['cjoints_2d']
+            deviations = deviations_list[t]['deviations']
+            
+            deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh)
 
-            bjoints_2d = deviations_list[gidx]['bjoints_2d']
-            cjoints_2d = deviations_list[gidx]['cjoints_2d']
-            deviations = deviations_list[gidx]['deviations']
-            print('deviations ', deviations)
-            deviations = mask_dev(deviations, bjoints_2d, cjoints_2d)
-
-            bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=0.35)
+            bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
 
             cframe = print_deviations(cframe, deviations)
-            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=0.35)
+            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)
 
+            if isalign:text = "   ALIGNED"
+            else:text = "  NOT-ALIGNED"
+
+            bframe = cv2.putText(bframe, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA) 
+            cframe = cv2.putText(cframe, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA) 
+            
             bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
             cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
-
-            gidx += 1
             concat = np.hstack((bframe, cframe))
-            print('concat ', concat.shape)
+            concat = cv2.putText(concat, text, (400, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA)
+            
             video_writer.write(concat)
-            cv2.imshow('Baseline ', bframe)
-            cv2.imshow('Candidate ', cframe)
+            cv2.imshow('output ', concat)
             cv2.waitKey(-1)
 
     video_writer.release()

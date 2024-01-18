@@ -127,9 +127,13 @@ def pose_embed_video_align(align_path):
         pairs = json.load(file)
 
     pairs_np = np.array(pairs)
-    align_ids = pairs_np[:, -1]
-    indices = np.where(align_ids == 1)[0]
-    align_pairs = pairs_np[indices][:, :2].astype('int')
+
+    # align_ids = pairs_np[:, -1]
+    # align_indices = np.where(align_ids == 1)[0]
+
+    # align_pairs = pairs_np[align_indices][:, :2].astype('int')
+
+    align_pairs = pairs_np[:, [0, 1, 3]].astype('int')
 
     return align_pairs.tolist()
 

@@ -15,6 +15,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from numpy import linalg as LA
 from scipy.spatial import procrustes
 import utils
+import render
 import calc_angles as ca
 
 def get_min_max(joint_3ds):
@@ -87,14 +88,17 @@ def align_candidate_pose_up(base_3d_joints, cand_3d_joints):
 
 def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=False):
 
+    if np.all(base_joints_3d == 0.0) or np.all(cand_joints_3d == 0.0):
+        return [0] * 10
+
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
     if vis:
         plot_3d(ax2, bjoints_2d, base_joints_3d, colors[0], shiftx=0.25)
-        plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.45)
+        plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.25)
 
         vis_vector(ax2, base_joints_3d, shiftx=0.25)
-        vis_vector(ax2, cand_joints_3d, shiftx=0.45)
+        vis_vector(ax2, cand_joints_3d, shiftx=0.25)
         
     trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)   
     trunk_twist_dev = ca.get_trunk_twist_dev(base_joints_3d, cand_joints_3d)   
@@ -102,11 +106,12 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
     # lower body align
     base_joints_aligned_low, cand_joints_aligned_low = align_candidate_pose_low(base_joints_3d, cand_joints_3d)
 
-    pad = 0.15
-    gminn, gmaxn = get_min_max(cand_joints_aligned_low)
-    ax2.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-    ax2.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
-    ax2.set_zlim([gminn - pad, gmaxn + pad])            
+    if vis:
+        pad = 0.15
+        gminn, gmaxn = get_min_max(cand_joints_aligned_low)
+        ax2.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+        ax2.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
+        ax2.set_zlim([gminn - pad, gmaxn + pad])            
 
     lthigh_dev = ca.get_left_thigh_dev(base_joints_aligned_low, cand_joints_aligned_low)
 
@@ -151,15 +156,29 @@ def vis_vector(ax, joints_3d_org, shiftx=0.0):
 
     joints_3d = joints_3d_org.copy()
     joints_3d[:, 0] += shiftx
-    _, pts = ca.get_right_forearm_vector(joints_3d)
+    # _, pts = ca.get_right_forearm_vector(joints_3d)
+    # s, e = pts
+
+    # ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
+
+    _, pts = ca.get_left_arm_vector(joints_3d)
     s, e = pts
 
     ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
 
-    _, pts = ca.get_right_arm_vector(joints_3d)
-    s, e = pts
+def create_path_ids(tb, tc, pad):
 
-    ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
+    bs = list(range(tb - pad, tb + pad))
+    cs = list(range(tc - pad, tc + pad))
+
+    bs = np.expand_dims(bs, axis=1)
+    cs = np.expand_dims(cs, axis=1)
+    align = np.ones((len(cs), 1))
+
+    pair_lst = np.hstack((bs, cs))
+    pair_lst = np.hstack((pair_lst, align)).astype('int')
+
+    return pair_lst.tolist()
 
 def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out_pkl, vis=False):
 
@@ -181,18 +200,36 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     bpose_2ds, cpose_2ds = poses_2d_list[0], poses_2d_list[1] 
     deviations_lst = []
 
-    for t, (b, c) in enumerate(path_ids):
+    # tb, tc = 268, 332
+    # path_ids = create_path_ids(tb, tc, pad=5)
+
+    for t, (b, c, isalign) in enumerate(path_ids):
 
         frame1 = base_video[b]
         frame2 = cand_video[c]
-                                                
-        bjoints_3d = bpose_3ds[b][0]['keypoints_3d']
-        bjoints_2d = bpose_3ds[b][0]['keypoints']
-        btid = bpose_3ds[b][0]['track_id']
-
-        cjoints_3d = cpose_3ds[c][0]['keypoints_3d']
-        cjoints_2d = cpose_3ds[c][0]['keypoints']
-        ctid = cpose_3ds[c][0]['track_id']
+        
+        if len(bpose_3ds[b]):
+            bjoints_3d = bpose_3ds[b][0]['keypoints_3d']
+            bjoints_2d = bpose_3ds[b][0]['keypoints']
+            btid = bpose_3ds[b][0]['track_id']
+            bface_2d = bpose_2ds[b][0]['keypoints_2d'][[0, 1, 2, 3, 4, 17]]        
+            bsjoints_2d = np.concatenate((bjoints_2d, bface_2d), axis = 0)   
+        else:
+            bjoints_3d = np.zeros((17, 3), dtype="float")
+            bjoints_2d = np.zeros((17, 3), dtype="float")
+            btid = 0
+            bsjoints_2d = np.zeros((23, 3), dtype="float")
+        if len(cpose_3ds[c]):
+            cjoints_3d = cpose_3ds[c][0]['keypoints_3d']
+            cjoints_2d = cpose_3ds[c][0]['keypoints']
+            ctid = cpose_3ds[c][0]['track_id']
+            cface_2d = cpose_2ds[c][0]['keypoints_2d'][[0, 1, 2, 3, 4, 17]]           
+            csjoints_2d = np.concatenate((cjoints_2d, cface_2d), axis = 0)
+        else:
+            cjoints_3d = np.zeros((17, 3), dtype="float")
+            cjoints_2d = np.zeros((17, 3), dtype="float")
+            ctid = 0
+            csjoints_2d = np.zeros((23, 3), dtype="float")
 
         if not (btid == ctid and btid == req_tid): continue
 
@@ -203,21 +240,20 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             ax2.clear()
             ax3.clear()
 
-            ax1.set_title(f"3D Joints Frame {t+1}")
+            ax1.set_title(f"3D Joints Frame {t}")
 
-            ax.set_title(f"2D Joints Baseline Frame {t+1}")
-            ax3.set_title(f"2D Joints Candidate Frame {t+1}")
+            ax.set_title(f"2D Joints Baseline Frame {b}")
+            ax3.set_title(f"2D Joints Candidate Frame {c}")
 
             plot_3d(ax1, bjoints_2d, bjoints_3d, colors[0], shiftx=0.0)
 
             plot_3d(ax1, cjoints_2d, cjoints_3d, colors[1], shiftx=0.5)
 
-        deviations = cal_dev(bjoints_3d, cjoints_3d, bjoints_2d, cjoints_2d, ax2, vis=vis)
-
-        bface_2d = bpose_2ds[b][0]['keypoints_2d'][[0, 1, 2, 3, 4, 17]]           
-        cface_2d = cpose_2ds[c][0]['keypoints_2d'][[0, 1, 2, 3, 4, 17]]           
-        csjoints_2d = np.concatenate((cjoints_2d, cface_2d), axis = 0)
-        bsjoints_2d = np.concatenate((bjoints_2d, bface_2d), axis = 0)
+        if isalign:
+            if not vis:ax2=None
+            deviations = cal_dev(bjoints_3d, cjoints_3d, bjoints_2d, cjoints_2d, ax2=ax2, vis=vis)
+        else:
+            deviations = [0] * 10
 
         deviations_lst.append({'deviations':deviations, 'cjoints_2d':csjoints_2d, 'bjoints_2d':bsjoints_2d})
 
@@ -225,10 +261,14 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
             ax2.set_title(f"trunk: {trunk_dev} \n trunk twist: {trunk_twist_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
 
+            frame1 = cv2.putText(frame1, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA)
             frame1 = draw_2d_skeletons_3d(frame1, bjoints_2d, (0, 0, 255), conf_thresh = conf_thresh)
             frame1 = cv2.resize(frame1, None, fx=0.5, fy=0.5)
             ax.imshow(cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB))
 
+            frame2 = cv2.putText(frame2, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA)
             frame2 = draw_2d_skeletons_3d(frame2, cjoints_2d, (0, 255, 0), conf_thresh = conf_thresh)
             frame2 = cv2.resize(frame2, None, fx=0.5, fy=0.5)
             ax3.imshow(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
@@ -283,29 +323,30 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = 'Removing_Item_from_Bottom_of_Cart' # # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
-    root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'
-    # align_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/" + act_name + "/baseline_candidate-dtw_path.json"
-    align_path = "/home/tumeke-balaji/Documents/results/delta/aligns/Removing_Item_from_Bottom_of_Cart/baseline_candidate-dtw_path.json"
-    
+    act_name = "Stowing_carrier"
+    # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
+    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/' + act_name + '/'
+    align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
+    output_video_path = root_pose + act_name + '_dev.mov'
+
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0
     conf_thresh = 0.35
 
     video_lst, poses_2ds, poses_3ds = [], [], []
-
+    video_paths = []
     # get alignment
     # path_lst = utils.manual_video_align(act_name)
     path_pairs = utils.pose_embed_video_align(align_path)
 
     for file_name in file_names:
-        pose_dir = root_pose + file_name + '/'
-        video_path = pose_dir + file_name + '.mov'
-
+        pose_dir = root_pose + '/poses/joints/'
+        video_path = root_pose + 'videos/' + file_name + '.mov'
+        video_paths.append(video_path)
         video = mmcv.VideoReader(video_path)
 
-        pose_path = pose_dir + '/pose_3d.p'
-        pose_path_2d = pose_dir + '/pose_2d.p'
+        pose_path = pose_dir + file_name + '_pose_3d.p'
+        pose_path_2d = pose_dir + file_name + '.pkl'
         print('pose_path ', pose_path)
 
         with open(pose_path_2d, 'rb') as f:
@@ -322,4 +363,9 @@ if __name__ == "__main__":
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
 
-    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=True)
+    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
+
+    with open(out_pkl, 'rb') as f:
+        deviations = pickle.load(f)
+
+    render.render_results(video_paths[0], video_paths[1], output_video_path, path_pairs, deviations, conf_thresh)
