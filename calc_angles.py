@@ -67,7 +67,25 @@ def get_left_arm_vector(joints_3d):
 
     return larm_vector, [lshoulder, lelbow]
 
+def get_left_arm_dev0(base_joints_3d, cand_joints_3d):
+
+    blarm_vector, _ = get_left_arm_vector(base_joints_3d)
+    clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
+
+    larm_dev = np.arccos(np.dot(clarm_vector, blarm_vector)) * 180.0 / np.pi
+
+    return np.round(larm_dev, 2)
+
 def get_left_arm_dev(base_joints_3d, cand_joints_3d):
+
+    blarm_vector, _ = get_left_arm_vector(base_joints_3d)
+    clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
+    
+    larm_dev = np.arccos(np.dot(clarm_vector, blarm_vector)) * 180.0 / np.pi
+
+    return np.round(larm_dev, 2)
+
+def get_left_arm_dev0(base_joints_3d, cand_joints_3d):
 
     blarm_vector, _ = get_left_arm_vector(base_joints_3d)
     clarm_vector, _ = get_left_arm_vector(cand_joints_3d)

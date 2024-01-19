@@ -93,7 +93,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
-    if False:
+    if vis:
         plot_3d(ax2, bjoints_2d, base_joints_3d, colors[0], shiftx=0.25)
         plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.25)
 
@@ -121,7 +121,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     rleg_dev = ca.get_right_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
 
-    if vis:
+    if False:
         low_idxs = list(range(0, 7))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_low, colors[0], shiftx=0.50, idxs = low_idxs)
 
@@ -141,7 +141,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     rfarm_dev = ca.get_right_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
 
-    if False:
+    if vis:
         up_idxs = list(range(11, 17))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_up, colors[0], shiftx=0.0, idxs = up_idxs)
 
@@ -184,7 +184,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
 
     if vis:
         fig = plt.figure(figsize=(12, 6))
-        gs = GridSpec(1, 4, width_ratios=[0.5, 0.5, 1, 0.5])
+        gs = GridSpec(1, 4, width_ratios=[0.5, 1, 1, 0.5])
 
         # Initialize Matplotlib 3D plot in the first subplot
         ax = fig.add_subplot(gs[0]) 
@@ -200,8 +200,10 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     bpose_2ds, cpose_2ds = poses_2d_list[0], poses_2d_list[1] 
     deviations_lst = []
 
-    # tb, tc = 268, 332
-    # path_ids = create_path_ids(tb, tc, pad=5)
+    tb, tc = 131, 115 #Closing_Overhead_Bin
+    # tb, tc = 178, 174 #Lift_Galley_Carrier
+    # tb, tc = 231, 271 #Stow_Full_Cart
+    path_ids = create_path_ids(tb, tc, pad=5)
 
     for t, (b, c, isalign) in enumerate(path_ids):
 
@@ -247,7 +249,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
 
             plot_3d(ax1, bjoints_2d, bjoints_3d, colors[0], shiftx=0.0)
 
-            plot_3d(ax1, cjoints_2d, cjoints_3d, colors[1], shiftx=0.5)
+            plot_3d(ax1, cjoints_2d, cjoints_3d, colors[1], shiftx=0.25)
 
         if isalign:
             if not vis:ax2=None
@@ -273,7 +275,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             frame2 = cv2.resize(frame2, None, fx=0.5, fy=0.5)
             ax3.imshow(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
 
-            pad = 0.0
+            pad = 0.25
             gminn, gmaxn = get_min_max(cjoints_3d)
             ax1.set_xlim([gminn - pad, gmaxn + pad])  # Adjust as necessary
             ax1.set_ylim([gminn - pad, gmaxn + pad])  # Adjust as necessary
@@ -284,8 +286,8 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             ax2.set_zlabel('Z')
 
             plt.tight_layout()
-            plt.pause(0.00001)
-            # plt.pause(1)
+            # plt.pause(0.00001)
+            plt.pause(5)
             # plt.show()
 
     with open(save_out_pkl, 'wb') as f:
@@ -323,7 +325,7 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = "Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    act_name = "Closing_Overhead_Bin" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_data/' + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
@@ -363,9 +365,9 @@ if __name__ == "__main__":
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
 
-    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
+    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=True)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)
 
-    render.render_results(video_paths[0], video_paths[1], output_video_path, path_pairs, deviations, conf_thresh)
+    # render.render_results(video_paths[0], video_paths[1], output_video_path, path_pairs, deviations, conf_thresh)
