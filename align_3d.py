@@ -93,7 +93,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
-    if vis:
+    if False:
         plot_3d(ax2, bjoints_2d, base_joints_3d, colors[0], shiftx=0.25)
         plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.25)
 
@@ -141,7 +141,7 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     rfarm_dev = ca.get_right_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
 
-    if vis:
+    if False:
         up_idxs = list(range(11, 17))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_up, colors[0], shiftx=0.0, idxs = up_idxs)
 
@@ -323,9 +323,9 @@ if __name__ == "__main__":
     ]
 
     file_names = ['baseline', 'candidate']
-    act_name = "Serving_from_Basket"
+    act_name = "Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
-    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/' + act_name + '/'
+    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_data/' + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
     output_video_path = root_pose + act_name + '_dev.mov'
 
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
 
-    # align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=True)
+    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)

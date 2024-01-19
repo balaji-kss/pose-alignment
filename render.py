@@ -38,9 +38,11 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
 
 angle_bounds = {
     'trunk': [[0, 10], [10, 20], [20, 30], [30, 45], [45, sys.maxsize]],
+    # 'trunk': [[0, 2.5], [2.5, 7.5], [7.5, 15], [15, 20], [20, sys.maxsize]],
     'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
     'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
     'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
+    # 'thigh': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],
     'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
 }
 
@@ -140,13 +142,17 @@ def get_skeleton_thickness(frame_size):
     thickness = int(max(1, smaller_dim/120))
     return thickness
 
-def drawSkeleton(frame, joints_2d, deviations, base=False, thresh=0.35):
+def drawSkeleton(frame, joints_2d, deviations, base, thresh):
 
     for pair in skeletonMapping:
         startPoint = get_point(joints_2d, pair[0])
         endPoint = get_point(joints_2d, pair[1])
         start_score = joints_2d[jointMapping[pair[0]], 2]
         end_score = joints_2d[jointMapping[pair[1]], 2]
+
+        if pair[0] == "Right knee":
+            print(base, ' start_score ', start_score)
+
         if (startPoint[0] < 0 or startPoint[1] < 0 or endPoint[0] < 0 or endPoint[1] < 0 or start_score < thresh or end_score < thresh):
             continue
         startPoint = (int(startPoint[0]), int(startPoint[1]))
@@ -198,7 +204,7 @@ def print_deviations(frame, deviations):
     
     return frame
 
-def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh = 0.35):
+def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh):
 
     for idx in idxs:
         if bjoints_2d[idx, 2] < thresh or cjoints_2d[idx, 2] < thresh:
@@ -236,10 +242,12 @@ def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviat
     # Define video writer
     video_writer = cv2.VideoWriter(output_video_path,
                                 fourcc, cvideo.fps, (1080, 960))
-
-
+    
     # Iterate through both videos
+
     for t, (b, c, isalign) in enumerate(path_ids):
+
+            # if not isalign:continue
 
             bframe = bvideo[b].copy()
             cframe = cvideo[c].copy()  
@@ -248,6 +256,11 @@ def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviat
             cjoints_2d = deviations_list[t]['cjoints_2d']
             deviations = deviations_list[t]['deviations']
             
+            # if b < 280: # Lifting Luggage
+            #     bjoints_2d[2, :] = 0.0
+            # if c < 340:
+            #     cjoints_2d[2, :] = 0.0
+
             deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh)
 
             bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)

@@ -156,7 +156,7 @@ def list_subdirs(directory_path):
 
 if __name__ == "__main__":
 
-    root_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/"
+    root_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_data/"
     input_dirs = list_subdirs(root_dir) # "Serving_from_Basket" #  # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     gpu_id = 0
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")

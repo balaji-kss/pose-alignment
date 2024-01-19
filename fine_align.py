@@ -187,6 +187,11 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
         print(b, c, dist)
         cv2.putText(cframe, 'PMPJPE: ' + str(dist), (250, 40), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+        bframe = cv2.putText(bframe, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                1, (0, 0, 255), 2, cv2.LINE_AA) 
+        cframe = cv2.putText(cframe, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                1, (0, 0, 255), 2, cv2.LINE_AA) 
         concat = np.hstack((bframe, cframe))
         concat = cv2.resize(concat, None, fx=0.5, fy=0.5)
         video_writer.write(concat)
@@ -198,15 +203,15 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
 
 if __name__ == "__main__":
 
-    act_name =  'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
-    root_pose = '/home/tumeke-balaji/Documents/results/delta/joints/' + act_name + '/'    
+    act_name =  'Make_Coffee' # 'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
+    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/' + act_name + '/'    
 
-    bvideo_path = root_pose + '/baseline/baseline_n.mov'
-    cvideo_path = root_pose + '/candidate/candidate_n.mov'
+    bvideo_path = root_pose + '/videos/baseline.mov'
+    cvideo_path = root_pose + '/videos/candidate.mov'
     out_video_path = root_pose + act_name + '_align.mov'
 
-    bpose_path_3d = "/home/tumeke-balaji/Documents/results/delta/joints/" + act_name + "/baseline/pose_3d.p"
-    cpose_path_3d = "/home/tumeke-balaji/Documents/results/delta/joints/" + act_name + "/candidate/pose_3d.p"
+    bpose_path_3d = root_pose + "/poses/joints/baseline_pose_3d.p"
+    cpose_path_3d = root_pose + "/poses/joints/candidate_pose_3d.p"
 
     connections = [
         (0, 1),
