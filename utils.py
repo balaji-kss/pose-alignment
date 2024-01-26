@@ -77,9 +77,11 @@ def normalize_segment(bsegment, csegment):
 
     new_bids = np.expand_dims(new_bids, axis=1)
     new_cids = np.expand_dims(new_cids, axis=1)
+    ones = np.ones((len(new_cids), 1))
 
     pair_lst = np.hstack((new_bids, new_cids))
-
+    pair_lst = np.hstack((pair_lst, ones)).astype('int')
+    
     return pair_lst.tolist()
 
 def get_segs(vname):
@@ -107,6 +109,11 @@ def get_segs(vname):
     if vname == "Serving_from_Basket":
         v1_seg = [[90, 155], [165, 185], [185, 240], [245, 300]] # baseline
         v2_seg = [[90, 120], [120, 145], [145, 193],[ 195, 220]] # candidate
+        return v1_seg, v2_seg 
+
+    if vname == "Lift_Luggage":
+        v1_seg = [[0, 24], [24, 50], [50, 100], [100, 150], [150, 210], [210, 260], [260, 290]] # baseline
+        v2_seg = [[0, 24], [48, 79], [79, 140], [140, 170], [170, 230], [230, 311], [311, 353]] # candidate
         return v1_seg, v2_seg 
 
 def manual_video_align(vname):
@@ -137,30 +144,71 @@ def pose_embed_video_align(align_path):
 
     return align_pairs.tolist()
 
-def video_align():
+def get_all_frames(video1, video2):
 
-    name = 'Removing_Item_from_Bottom_of_Cart'
-    video_path1 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/baseline/baseline_n.mov"
-    video_path2 = "/home/tumeke-balaji/Documents/results/delta/joints/" + name + "/candidate/candidate_n.mov"
-    align_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/" + name + "/baseline_candidate-dtw_path.json"
+    max_len = max(len(video1), len(video2))
+    
+    video1_idxs = list(range(max_len))
+    video2_idxs = list(range(max_len))  
+
+    new_bids = np.expand_dims(video1_idxs, axis=1)
+    new_cids = np.expand_dims(video2_idxs, axis=1)
+
+    new_bids[new_bids > len(video1) - 1] = len(video1) - 1
+    new_cids[new_cids > len(video2) - 1] = len(video2) - 1
+
+    pair_lst = np.hstack((new_bids, new_cids)).tolist()
+
+    return pair_lst
+
+def compare_videos():
+
+    video_path1 = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/Removing_Item_from_Bottom_of_Cart_dev-angle.mov"
+    video_path2 = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/Removing_Item_from_Bottom_of_Cart_dev.mov"
+
     # Load videos
     video1 = mmcv.VideoReader(video_path1)
     video2 = mmcv.VideoReader(video_path2)
 
-    path_pairs = pose_embed_video_align(align_path)
+    # Iterate through both videos
+    for (b, c) in zip(range(len(video1)), range(len(video2))):
+
+        frame1 = video1[b]
+        frame2 = video2[c]
+    
+        frame1 = cv2.resize(frame1, None, fx = 0.5, fy = 0.5)
+        frame2 = cv2.resize(frame2, None, fx = 0.5, fy = 0.5)
+        cv2.imshow('Baseline ', frame1)
+        cv2.imshow('Candidate ', frame2)
+        cv2.waitKey(-1)
+
+def video_align():
+
+    input_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/"
+    name = "Lift_Luggage"
+    video_path1 = input_dir + name + "/videos/baseline.mov"
+    video_path2 = input_dir + name + "/videos/candidate.mov"
+    align_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/" + name + "/baseline_candidate-dtw_path.json"
+
+    # Load videos
+    video1 = mmcv.VideoReader(video_path1)
+    video2 = mmcv.VideoReader(video_path2)
+
+    path_pairs = manual_video_align(name)
+    # path_pairs = pose_embed_video_align(align_path)
+    # path_pairs = get_all_frames(video1, video2)
 
     # Iterate through both videos
-    for t, (b, c) in enumerate(path_pairs):
+    for t, (b, c, _) in enumerate(path_pairs):
 
         frame1 = video1[b]
         frame2 = video2[c]
 
-        # joints_2d1 = pose_3d1[s1 + i][0]['keypoints']
-        # joints_2d2 = pose_3d2[s2 + i][0]['keypoints']
-        
-        # frame1 = draw_2d_skeletons_3d(frame1, joints_2d1, conf_thresh = 0.35)
-        # frame2 = draw_2d_skeletons_3d(frame2, joints_2d2, (255, 0, 0), 0.35)
-        
+        frame1 = cv2.putText(frame1, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                1, (0, 0, 255), 2, cv2.LINE_AA) 
+        frame2 = cv2.putText(frame2, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                1, (0, 0, 255), 2, cv2.LINE_AA) 
+    
         frame1 = cv2.resize(frame1, None, fx = 0.5, fy = 0.5)
         frame2 = cv2.resize(frame2, None, fx = 0.5, fy = 0.5)
         cv2.imshow('Baseline ', frame1)
@@ -252,6 +300,49 @@ def merge_videos():
         
     video_writer.release()
 
+def read_joint_files(deviations, bin_path):
+
+    f = open(bin_path, "rb")
+    num_frames = 0
+    header_len = 4 * 4
+    byte_arr = f.read(header_len)
+    header = np.frombuffer(byte_arr, dtype=np.float32).tolist()
+    num_people = int(header[0])
+    num_angles_per_person = int(header[1]) * 4
+
+    while True:
+        for j in range(num_people):
+            byte_arr = f.read(num_angles_per_person)
+            if (byte_arr == b''):
+                f.close()
+                return num_frames
+            deviations.append(
+                np.frombuffer(byte_arr, dtype=np.float32).tolist()
+            )
+        num_frames += 1
+    f.close()
+    return num_frames
+
+def check_binary():
+
+    pkl_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/angles.pkl"
+    bin_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/deviations.bin"
+
+    deviations_bin = []
+    with open(pkl_path, 'rb') as f:
+        deviations = pickle.load(f)
+
+    read_joint_files(deviations_bin, bin_path)                     
+
+    print('len pkl ', len(deviations))
+    print('len bin ', len(deviations_bin))
+    
+    for i in range(len(deviations_bin)):
+        dev_pkl = deviations[i]['deviations']
+        dev_bin = deviations_bin[i]
+        print('dev_pkl ', dev_pkl, len(dev_pkl))
+        print('dev_bin ', dev_bin[3:], len(dev_bin))
+
 if __name__ == "__main__":  
 
     connections = [
@@ -280,8 +371,12 @@ if __name__ == "__main__":
     # number_frames()
 
     # check start and end of action for video alignment
-    video_align()
+    # video_align()
+
+    # compare_videos()
 
     # render_entire_video()
 
     # merge_videos()
+
+    check_binary()

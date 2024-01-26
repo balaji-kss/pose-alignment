@@ -7,6 +7,126 @@ from scipy.linalg import orthogonal_procrustes
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 from scipy.signal import convolve2d
+from matplotlib.patches import Circle
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import os
+import imageio
+from tqdm import tqdm
+
+def draw_2d_skeletons(frame, kpts_2d, color=(255, 0, 0), scale = (1, 1)):
+    radius = 5
+    connections_2d = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6], [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6], [18, 19], [19, 20], [20, 21], [22, 23], [23, 24], [24, 25], [26, 27], [27, 28], [28, 29], [30, 31], [31, 32], [32, 33], [34, 35], [35, 36], [36, 37], [38, 39], [39, 40], [40, 41]]
+    
+    for sk_id, sk in enumerate(connections_2d):
+        if sk[0] > 16 or sk[1] > 16:continue
+        pos1 = (int(kpts_2d[sk[0], 0]*scale[0]), int(kpts_2d[sk[0], 1]*scale[1]))
+        pos2 = (int(kpts_2d[sk[1], 0]*scale[0]), int(kpts_2d[sk[1], 1]*scale[1]))
+        cv2.line(frame, pos1, pos2, color, thickness=radius)
+        
+    return frame
+
+def fetch_segment_frames(vid, poses, new_w, new_h, index, pose_win_sec=0.3):
+    """ Since we move the sliding window forward in stride=pose_win/2 frames, for simplification, unless the last index,
+    we only fetch pose_win//2 frames for each index
+    """
+    def get_saliency(person_dict):
+        # Assuming the bounding box format is [x1, y1, x2, y2, score]
+        bbox = person_dict['bbox']
+        w, h = bbox[2]-bbox[0], bbox[3]-bbox[1]
+        area = w * h
+        return area      
+    stride = 1 # max(1, int(vid.fps * pose_win_sec / 2))
+    clips = []
+    st = index * stride
+    ed = min(vid.frame_cnt, (index+1) * stride)
+    for i in range(st, ed):
+        frame1 = vid[i]
+        scale = (new_w / frame1.shape[1], new_h / frame1.shape[0])
+        frame1 = mmcv.imresize(frame1, (new_w, new_h))         
+        if poses[i]:
+            most_salient_person_1 = max(poses[i], key=get_saliency)
+            most_salient_person_1['keypoints'] = most_salient_person_1['keypoints_2d'][:17]
+            # draw_pose_frame_1 = vis_pose_result(pose_model, frame1, [most_salient_person_1])
+            draw_pose_frame_1 = draw_2d_skeletons(frame1, most_salient_person_1['keypoints'], scale=scale)
+            frame1 = draw_pose_frame_1[:,:,::-1]
+        frame1 = mmcv.imresize(frame1, (new_w//2, new_h//2))
+        clips.append(frame1)
+    # clips = np.stack(clips)
+    return clips
+
+def generate_dtw_alignment_video(template_name, candidate_name, distance_np, dtw_path, task_path, pose_folders, normal_folders, pose_win_sec=0.3):
+
+    template_pose_file = os.path.join(pose_folders[0], f"{template_name}.pkl")
+    template_video_file = os.path.join(normal_folders[0], f"{template_name}_normal.mp4")
+
+    candidate_pose_file = os.path.join(pose_folders[1], f"{candidate_name}.pkl")
+    candidate_video_file = os.path.join(normal_folders[1], f"{candidate_name}_normal.mp4")
+
+    # get the meta data of video file
+    template_vid = mmcv.VideoReader(template_video_file)
+    candidate_vid = mmcv.VideoReader(candidate_video_file)
+
+    SHORT_SIDE = 480
+    with open(template_pose_file, 'rb') as kp:
+        template_poses = pickle.load(kp)    
+    with open(candidate_pose_file, 'rb') as kp:
+        candidate_poses = pickle.load(kp)            
+    new_w, new_h = mmcv.rescale_size((template_vid.width, template_vid.height), (SHORT_SIDE, np.Inf))
+    # new_w, new_h = template_vid.width, template_vid.height
+
+    # Calculate the aspect ratio of the DTW plot
+    plot_aspect_ratio = 1
+    plot_new_height = int(new_w//2 * plot_aspect_ratio)
+
+    # Set up the DTW path visualization
+    fig, ax = plt.subplots()
+    cax = ax.imshow(distance_np, origin='lower', cmap='viridis', interpolation='nearest', aspect='auto')
+    ax.plot(dtw_path[:, 1], dtw_path[:, 0], color='cyan', linestyle='-', linewidth=4, alpha=0.5)
+    circle = Circle((0, 0), radius=4, color='red', fill=True)
+    ax.add_patch(circle)
+    # Initialize a text box for distance value
+    distance_text = ax.text(0, 0, '', color='white', fontsize=20, ha='left', va='top', backgroundcolor='black')    
+    canvas = FigureCanvas(fig)
+
+    writer = imageio.get_writer(f"{task_path}/{template_name}_{candidate_name}_alignment-fa.mp4", fps=int(min(template_vid.fps, candidate_vid.fps)))
+    pre_frames_1, pre_frames_2 = [], []
+
+    for i, (index1, index2, _) in tqdm(enumerate(dtw_path)):
+        # fetch the index1 / index2 segment frames from both videos
+        frames_1 = fetch_segment_frames(template_vid, template_poses, new_w, new_h, index1, pose_win_sec)
+        frames_2 = fetch_segment_frames(candidate_vid, candidate_poses, new_w, new_h, index2, pose_win_sec)
+        num_f = min(len(frames_1), len(frames_2))
+
+        # check constant index
+        if i > 0 and index1 == dtw_path[i-1][0]:
+            frames_1 = [ pre_frames_1[-1] for _ in range(num_f)]
+        if i > 0 and index2 == dtw_path[i-1][1]:
+            frames_2 = [ pre_frames_2[-1] for _ in range(num_f)]
+
+        # Update the DTW path visualization
+        circle.center = (index2, index1)
+        # Update the distance text
+        d = distance_np[index1, index2]
+        distance_text.set_position((index2, index1))
+        distance_text.set_text(f'{d:.2f}')   
+
+        canvas.draw()  # Render the canvas as an image
+        dtw_plot_image = np.fromstring(canvas.tostring_rgb(), dtype='uint8', sep='')
+        dtw_plot_image = dtw_plot_image.reshape(canvas.get_width_height()[::-1] + (3,))
+
+        dtw_plot_image = cv2.resize(dtw_plot_image, (new_w//2, plot_new_height))
+
+        # Pad the DTW plot image to match the height of the video frames
+        pad_height = (new_h//2 - plot_new_height) // 2
+        dtw_plot_image_padded = np.pad(dtw_plot_image, ((pad_height, new_h//2 - plot_new_height - pad_height), (0, 0), (0, 0)), mode='constant', constant_values=0)
+        # Combine the video frames and padded DTW plot image
+        # dtw_plot_image = cv2.resize(dtw_plot_image, (new_w//2, plot_new_height))
+        for f in range(num_f):
+            combined_frame = np.concatenate((frames_1[f], frames_2[f], dtw_plot_image_padded), axis=1)
+            writer.append_data(combined_frame)
+        pre_frames_1 = frames_1
+        pre_frames_2 = frames_2
+    writer.close()
 
 def plot_3d(ax, joints_3d_org, color, shiftx = 0.0, idxs = None):
 
@@ -147,6 +267,36 @@ def apply_average_filter(matrix, kernel_size):
     
     return filtered_matrix
 
+def find_indices_of_duplicates(array):
+
+    seen = {}
+    duplicate_indices = []
+    for idx, element in enumerate(array):
+        if element in seen:
+            # Add the index of the duplicate
+            duplicate_indices.append(idx)
+        else:
+            # Record the index of the first occurrence
+            seen[element] = idx
+
+    return duplicate_indices
+
+def get_pmpjpe_align(bvideo, cvideo, bposes_3d, cposes_3d):
+
+    dist_mat = dist_matrix(bvideo, cvideo, bposes_3d, cposes_3d)
+    dist_mat_np = np.array(dist_mat)
+    path = dtw_with_precomputed_distances(dist_mat_np)
+    path_np = np.array(path).astype('int')
+    
+    indicesb = find_indices_of_duplicates(path_np[:, 0])
+    indicesc = find_indices_of_duplicates(path_np[:, 1])
+
+    path_np[:, 2] = 1
+    
+    path_np[indicesb + indicesc, 2] = 0
+
+    return dist_mat_np, path_np.tolist()
+
 def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
 
     dist_mat = dist_matrix(bvideo, cvideo, bposes_3d, cposes_3d)
@@ -160,22 +310,6 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
     
     # dist_mat_avg = apply_average_filter(dist_mat, kernel_size = 9)
     dist_mat_avg = dist_mat
-    # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-
-    # cax1 = axs[0].imshow(dist_mat, cmap='viridis', aspect='auto')
-    # fig.colorbar(cax1, ax=axs[0])
-    # axs[0].set_title('Matrix 1')
-
-    # # Display second matrix
-    # cax2 = axs[1].imshow(dist_mat_avg, cmap='viridis', aspect='auto')
-    # fig.colorbar(cax2, ax=axs[1])
-    # axs[1].set_title('Matrix 2')
-
-    # plt.show()
-    
-    # plt.matshow(dist_mat)
-    # plt.colorbar()
-    # plt.pause(2)
 
     path = dtw_with_precomputed_distances(dist_mat_avg)
     print('path ', path)
@@ -192,10 +326,10 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
                 1, (0, 0, 255), 2, cv2.LINE_AA) 
         cframe = cv2.putText(cframe, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
                 1, (0, 0, 255), 2, cv2.LINE_AA) 
-        concat = np.hstack((bframe, cframe))
-        concat = cv2.resize(concat, None, fx=0.5, fy=0.5)
-        video_writer.write(concat)
-        print('concat shape ', concat.shape)
+        # concat = np.hstack((bframe, cframe))
+        # concat = cv2.resize(concat, None, fx=0.5, fy=0.5)
+        # video_writer.write(concat)
+
         cv2.imshow('concat ', concat)
         cv2.waitKey(-1)
 
@@ -203,15 +337,27 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
 
 if __name__ == "__main__":
 
-    act_name =  'Make_Coffee' # 'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
-    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/' + act_name + '/'    
+    bact_name =  'Stowing_carrier' # 'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
+    cact_name =  'Stowing_carrier'
+    # ["baseline.mov", "candidate.mov"]
 
-    bvideo_path = root_pose + '/videos/baseline.mov'
-    cvideo_path = root_pose + '/videos/candidate.mov'
-    out_video_path = root_pose + act_name + '_align.mov'
+    root_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/'
+    base_path = root_path + bact_name
+    cand_path = root_path + cact_name
+    
+    bvideo_path = base_path + "/videos/baseline.mov"
+    cvideo_path = cand_path + "/videos/candidate.mov"
 
-    bpose_path_3d = root_pose + "/poses/joints/baseline_pose_3d.p"
-    cpose_path_3d = root_pose + "/poses/joints/candidate_pose_3d.p"
+    out_video_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/' + bact_name + '_' + cact_name + '_align.mov'
+
+    bpose_path = root_path + bact_name + '/poses/joints/'
+    cpose_path = root_path + cact_name + '/poses/joints/'
+
+    bpose_path_3d = bpose_path + "baseline_pose_3d.p"
+    cpose_path_3d = cpose_path + "candidate_pose_3d.p"
+
+    bnormal_folder = base_path + '/videos/normalized_video/'
+    cnormal_folder = cand_path + '/videos/normalized_video/'
 
     connections = [
         (0, 1),
@@ -243,4 +389,16 @@ if __name__ == "__main__":
     with open(cpose_path_3d, 'rb') as f:
         cposes_3d = pickle.load(f)
 
-    get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d)
+    # get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d)
+
+    print('len bposes_3d ', len(bposes_3d))
+    print('len cposes_3d ', len(cposes_3d), len(cvideo))
+
+    distance_np, dtw_path = get_pmpjpe_align(bvideo, cvideo, bposes_3d, cposes_3d)
+
+    template_name  = "baseline" 
+    candidate_name = "candidate" 
+    task_path = base_path
+    pose_win_sec = 0.3
+
+    generate_dtw_alignment_video(template_name, candidate_name, distance_np, np.array(dtw_path), task_path, [bpose_path, cpose_path], [bnormal_folder, cnormal_folder], pose_win_sec=pose_win_sec)

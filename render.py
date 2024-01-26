@@ -37,12 +37,16 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
                    ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
 angle_bounds = {
-    'trunk': [[0, 10], [10, 20], [20, 30], [30, 45], [45, sys.maxsize]],
+    # 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
+    'trunk': [[0, 5], [5, 10], [15, 20], [20, 25], [25, sys.maxsize]],
+    # 'trunk': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
     # 'trunk': [[0, 2.5], [2.5, 7.5], [7.5, 15], [15, 20], [20, sys.maxsize]],
     'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
-    'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
+    'fore_arm': [[0, 25], [25, 50], [50, 75], [75, 100], [100, sys.maxsize]],
+    # 'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
     'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
-    # 'thigh': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],
+    # 'thigh': [[0, 15], [15, 40], [40, 60], [60, 80], [80, sys.maxsize]],
+    # 'leg': [[0, 20], [20, 40], [40, 60], [60, 150], [150, sys.maxsize]],
     'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
 }
 
@@ -103,6 +107,7 @@ def getColor(joints, deviations):
         joints == ["Right hip", "Left hip"] or \
         joints == ["Right hip", "Right shoulder"]):
         angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
+        angle = deviations[0]
         return get_color_helper("trunk", angle)
     
     if (joints == ["Right shoulder", "Right elbow"]):
@@ -144,19 +149,23 @@ def get_skeleton_thickness(frame_size):
 
 def drawSkeleton(frame, joints_2d, deviations, base, thresh):
 
+    # if base:
+    #     sx, sy = 1080, 1920
+    # else:
+    #     sx, sy = 1, 1
+
+    sx, sy = 1, 1
+
     for pair in skeletonMapping:
         startPoint = get_point(joints_2d, pair[0])
         endPoint = get_point(joints_2d, pair[1])
         start_score = joints_2d[jointMapping[pair[0]], 2]
         end_score = joints_2d[jointMapping[pair[1]], 2]
 
-        if pair[0] == "Right knee":
-            print(base, ' start_score ', start_score)
-
         if (startPoint[0] < 0 or startPoint[1] < 0 or endPoint[0] < 0 or endPoint[1] < 0 or start_score < thresh or end_score < thresh):
             continue
-        startPoint = (int(startPoint[0]), int(startPoint[1]))
-        endPoint = (int(endPoint[0]), int(endPoint[1]))
+        startPoint = (int(startPoint[0] * sx), int(startPoint[1] * sy))
+        endPoint = (int(endPoint[0] * sx), int(endPoint[1] * sy))
 
         if base:color = (0, 255, 0)
         else: color = getColor(pair, deviations)
@@ -169,7 +178,7 @@ def print_deviations(frame, deviations):
 
     trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
 
-    start = 40
+    start = 500
     step = 30
     w = 700
     frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (w, start), cv2.FONT_HERSHEY_SIMPLEX,  
@@ -233,15 +242,30 @@ def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
 
     return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
 
-def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviations_list, thresh):
+def crop_images(bframe, cframe, dtwframe):
+
+    bh, bw = bframe.shape[:2]
+    ch, cw = cframe.shape[:2]
+    dh, dw = dtwframe.shape[:2]
+
+    sz = np.min([bh, bw, ch, cw])
+    bframe = bframe[bh//2 - sz//2 : bh//2 + sz//2, bw//2 - sz//2 : bw//2 + sz//2]
+    cframe = cframe[ch//2 - sz//2 : ch//2 + sz//2, cw//2 - sz//2 : cw//2 + sz//2]
+
+    dtwframe = dtwframe[dh//2 - sz//2 : dh//2 + sz//2, dw//2 - sz//2 : dw//2 + sz//2]
+
+    return bframe, cframe, dtwframe 
+
+def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, path_ids, deviations_list, thresh):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
+    dtwvideo = mmcv.VideoReader(dtw_video_path)
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     # Define video writer
     video_writer = cv2.VideoWriter(output_video_path,
-                                fourcc, cvideo.fps, (1080, 960))
+                                fourcc, cvideo.fps, (1620, 540))
     
     # Iterate through both videos
 
@@ -251,17 +275,16 @@ def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviat
 
             bframe = bvideo[b].copy()
             cframe = cvideo[c].copy()  
+            dtwframe = dtwvideo[t].copy()  
 
             bjoints_2d = deviations_list[t]['bjoints_2d']
             cjoints_2d = deviations_list[t]['cjoints_2d']
             deviations = deviations_list[t]['deviations']
-            
-            # if b < 280: # Lifting Luggage
-            #     bjoints_2d[2, :] = 0.0
-            # if c < 340:
-            #     cjoints_2d[2, :] = 0.0
 
             deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh)
+            print('deviations ', deviations)
+            print('bjoints_2d ', bjoints_2d)
+            print('cjoints_2d ', cjoints_2d)
 
             bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
 
@@ -278,7 +301,12 @@ def render_results(bvideo_path, cvideo_path, output_video_path, path_ids, deviat
             
             bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
             cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
+            dtwframe = dtwframe[:, 1080:]
+            bframe, cframe, dtwframe = crop_images(bframe, cframe, dtwframe)
+            
             concat = np.hstack((bframe, cframe))
+            concat = np.hstack((concat, dtwframe))
+
             concat = cv2.putText(concat, text, (400, 40), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 2, cv2.LINE_AA)
             

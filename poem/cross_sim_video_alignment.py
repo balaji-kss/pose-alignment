@@ -71,15 +71,14 @@ def visualize_dtw_path(distance_matrix, dtw_path_indices, baseline, candidate, p
     plt.savefig(pathname, format='png')
     plt.close(fig)
 
-def draw_2d_skeletons(frame, kpts_2d, color=(255, 0, 0)):
+def draw_2d_skeletons(frame, kpts_2d, color=(255, 0, 0), scale = (1, 1)):
     radius = 5
-    scale = 1
     connections_2d = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6], [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6], [18, 19], [19, 20], [20, 21], [22, 23], [23, 24], [24, 25], [26, 27], [27, 28], [28, 29], [30, 31], [31, 32], [32, 33], [34, 35], [35, 36], [36, 37], [38, 39], [39, 40], [40, 41]]
     
     for sk_id, sk in enumerate(connections_2d):
         if sk[0] > 16 or sk[1] > 16:continue
-        pos1 = (int(kpts_2d[sk[0], 0]*scale), int(kpts_2d[sk[0], 1]*scale))
-        pos2 = (int(kpts_2d[sk[1], 0]*scale), int(kpts_2d[sk[1], 1]*scale))
+        pos1 = (int(kpts_2d[sk[0], 0]*scale[0]), int(kpts_2d[sk[0], 1]*scale[1]))
+        pos2 = (int(kpts_2d[sk[1], 0]*scale[0]), int(kpts_2d[sk[1], 1]*scale[1]))
         cv2.line(frame, pos1, pos2, color, thickness=radius)
         
     return frame
@@ -142,12 +141,13 @@ def fetch_segment_frames(vid, poses, new_w, new_h, index, pose_win_sec=0.3):
     ed = min(vid.frame_cnt, (index+1) * stride)
     for i in range(st, ed):
         frame1 = vid[i]
+        scale = (new_w / frame1.shape[1], new_h / frame1.shape[0])
         frame1 = mmcv.imresize(frame1, (new_w, new_h))         
         if poses[i]:
             most_salient_person_1 = max(poses[i], key=get_saliency)
             most_salient_person_1['keypoints'] = most_salient_person_1['keypoints_2d'][:17]
             # draw_pose_frame_1 = vis_pose_result(pose_model, frame1, [most_salient_person_1])
-            draw_pose_frame_1 = draw_2d_skeletons(frame1, most_salient_person_1['keypoints'])
+            draw_pose_frame_1 = draw_2d_skeletons(frame1, most_salient_person_1['keypoints'], scale=scale)
             frame1 = draw_pose_frame_1[:,:,::-1]
         frame1 = mmcv.imresize(frame1, (new_w//2, new_h//2))
         clips.append(frame1)

@@ -29,10 +29,40 @@
 
 # print('poses ', poses)
 
-import json
-json_path = '/home/tumeke-balaji/Documents/results/pose-estimation-3d/input_videos/results_vid1.json'
-json_data = json.load(open(json_path))
-skeleton = json_data['meta_info']['skeleton_links']
-skeleton_link_colors = json_data['meta_info']["skeleton_link_colors"]["__ndarray__"]
-kpt_colors = json_data['meta_info']["keypoint_colors"]["__ndarray__"]
-print('skeleton ', skeleton)
+# import json
+# json_path = '/home/tumeke-balaji/Documents/results/pose-estimation-3d/input_videos/results_vid1.json'
+# json_data = json.load(open(json_path))
+# skeleton = json_data['meta_info']['skeleton_links']
+# skeleton_link_colors = json_data['meta_info']["skeleton_link_colors"]["__ndarray__"]
+# kpt_colors = json_data['meta_info']["keypoint_colors"]["__ndarray__"]
+# print('skeleton ', skeleton)
+
+import numpy as np
+
+def find_segments(arr):
+    # Start with an empty list to store the segments
+    segments = []
+    
+    # Initialize start index and the initial value
+    start = 0
+    current_value = arr[0]
+    
+    # Iterate over the array
+    for i in range(1, len(arr)):
+        # Check if the value has changed
+        if arr[i] != current_value:
+            # If it has, record the segment
+            segments.append((current_value, start, i - 1))
+            # Update the start index and current value
+            start = i
+            current_value = arr[i]
+    
+    # Add the last segment
+    segments.append((current_value, start, len(arr) - 1))
+    
+    return segments
+
+# Example usage
+arr = np.array([1,1,1,1,1,1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0])
+segments = find_segments(arr)
+print(segments)

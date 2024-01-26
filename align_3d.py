@@ -14,6 +14,7 @@ import math
 from numpy.lib.stride_tricks import sliding_window_view
 from numpy import linalg as LA
 from scipy.spatial import procrustes
+import fine_align
 import utils
 import render
 import calc_angles as ca
@@ -200,10 +201,10 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     bpose_2ds, cpose_2ds = poses_2d_list[0], poses_2d_list[1] 
     deviations_lst = []
 
-    tb, tc = 131, 115 #Closing_Overhead_Bin
-    # tb, tc = 178, 174 #Lift_Galley_Carrier
-    # tb, tc = 231, 271 #Stow_Full_Cart
-    path_ids = create_path_ids(tb, tc, pad=5)
+    # tb, tc = 131, 115 #Closing_Overhead_Bin
+    # # tb, tc = 178, 174 #Lift_Galley_Carrier
+    # # tb, tc = 231, 271 #Stow_Full_Cart
+    # path_ids = create_path_ids(tb, tc, pad=5)
 
     for t, (b, c, isalign) in enumerate(path_ids):
 
@@ -286,8 +287,8 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             ax2.set_zlabel('Z')
 
             plt.tight_layout()
-            # plt.pause(0.00001)
-            plt.pause(5)
+            plt.pause(0.00001)
+            # plt.pause(5)
             # plt.show()
 
     with open(save_out_pkl, 'wb') as f:
@@ -324,22 +325,20 @@ if __name__ == "__main__":
         (8, 11),
     ]
 
-    file_names = ['baseline', 'candidate']
-    act_name = "Closing_Overhead_Bin" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline', 'candidate1']
+    act_name = "Incorrect_closing_OH_bin" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
-    root_pose = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_data/' + act_name + '/'
+    root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_incorrect_data/'
+    root_pose = root_dir + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
-    output_video_path = root_pose + act_name + '_dev.mov'
-
+    output_video_path = root_pose + act_name + '_dev1.mov'
+    dtw_video_path = root_pose + file_names[0] + "_" + file_names[1] + "_alignment.mp4"
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0
     conf_thresh = 0.35
 
     video_lst, poses_2ds, poses_3ds = [], [], []
-    video_paths = []
-    # get alignment
-    # path_lst = utils.manual_video_align(act_name)
-    path_pairs = utils.pose_embed_video_align(align_path)
+    video_paths = []    
 
     for file_name in file_names:
         pose_dir = root_pose + '/poses/joints/'
@@ -365,9 +364,14 @@ if __name__ == "__main__":
     out_pkl = root_pose + '/deviations.pkl'
     print('out_pkl ', out_pkl)
 
-    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=True)
+    # get alignment
+    # path_pairs = utils.manual_video_align(act_name)
+    path_pairs = utils.pose_embed_video_align(align_path)
+    # path_pairs = fine_align.get_pmpjpe_align(video_lst[0], video_lst[1], poses_3ds[0], poses_3ds[1])
+    
+    align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)
 
-    # render.render_results(video_paths[0], video_paths[1], output_video_path, path_pairs, deviations, conf_thresh)
+    render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
