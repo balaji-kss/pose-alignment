@@ -38,8 +38,8 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
 
 angle_bounds = {
     # 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
-    'trunk': [[0, 5], [5, 10], [15, 20], [20, 25], [25, sys.maxsize]],
-    # 'trunk': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
+    # 'trunk': [[0, 5], [5, 10], [15, 20], [20, 25], [25, sys.maxsize]],
+    'trunk': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
     # 'trunk': [[0, 2.5], [2.5, 7.5], [7.5, 15], [15, 20], [20, sys.maxsize]],
     'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
     'fore_arm': [[0, 25], [25, 50], [50, 75], [75, 100], [100, sys.maxsize]],
@@ -105,7 +105,9 @@ def getColor(joints, deviations):
 
     if (joints == ["Left hip", "Left shoulder"] or \
         joints == ["Right hip", "Left hip"] or \
-        joints == ["Right hip", "Right shoulder"]):
+        joints == ["Right hip", "Right shoulder"] or \
+        joints == ["Left shoulder", "Thorax"] or \
+        joints == ["Thorax", "Right shoulder"]):
         angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
         angle = deviations[0]
         return get_color_helper("trunk", angle)
@@ -174,13 +176,13 @@ def drawSkeleton(frame, joints_2d, deviations, base, thresh):
     
     return frame
 
-def print_deviations(frame, deviations):
+def print_deviations(frame, deviations, w=500):
 
     trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
 
-    start = 500
+    start = 100
     step = 30
-    w = 700
+    
     frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (w, start), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 1, cv2.LINE_AA) 
     y = start + step
@@ -212,35 +214,6 @@ def print_deviations(frame, deviations):
                    1, (0, 0, 255), 1, cv2.LINE_AA)
     
     return frame
-
-def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh):
-
-    for idx in idxs:
-        if bjoints_2d[idx, 2] < thresh or cjoints_2d[idx, 2] < thresh:
-            return 0.0
-        
-    return dev
-
-def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
-
-    # NOTE: check mask for trunk
-    # NOTE: get neck angle
-
-    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
-
-    larm_dev = valid_dev(larm_dev, bjoints_2d, cjoints_2d, [11, 12], thresh=thresh)
-    rarm_dev = valid_dev(rarm_dev, bjoints_2d, cjoints_2d, [14, 15], thresh=thresh)
-
-    lfarm_dev = valid_dev(lfarm_dev, bjoints_2d, cjoints_2d, [11, 12, 13], thresh=thresh)
-    rfarm_dev = valid_dev(rfarm_dev, bjoints_2d, cjoints_2d, [14, 15, 16], thresh=thresh)
-
-    lthigh_dev = valid_dev(lthigh_dev, bjoints_2d, cjoints_2d, [4, 5], thresh=thresh)
-    rthigh_dev = valid_dev(rthigh_dev, bjoints_2d, cjoints_2d, [1, 2], thresh=thresh)
-    
-    lleg_dev = valid_dev(lleg_dev, bjoints_2d, cjoints_2d, [4, 5, 6], thresh=thresh)
-    rleg_dev = valid_dev(rleg_dev, bjoints_2d, cjoints_2d, [1, 2, 3], thresh=thresh)
-
-    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
 
 def crop_images(bframe, cframe, dtwframe):
 
@@ -281,11 +254,6 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
             cjoints_2d = deviations_list[t]['cjoints_2d']
             deviations = deviations_list[t]['deviations']
 
-            deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh)
-            print('deviations ', deviations)
-            print('bjoints_2d ', bjoints_2d)
-            print('cjoints_2d ', cjoints_2d)
-
             bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
 
             cframe = print_deviations(cframe, deviations)
@@ -312,6 +280,40 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
             
             video_writer.write(concat)
             cv2.imshow('output ', concat)
+            cv2.waitKey(-1)
+
+    video_writer.release()
+
+def render_video(cvideo_path, output_video_path, deviations_dict, thresh):
+
+    cvideo = mmcv.VideoReader(cvideo_path)
+    cw, ch = cvideo.resolution
+    cw, ch = int(cw//2), int(ch//2)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # Define video writer
+    video_writer = cv2.VideoWriter(output_video_path,
+                                fourcc, cvideo.fps, (cw, ch))
+    
+    # Iterate through both videos
+    num_frames = len(deviations_dict)
+
+    for i in range(num_frames):
+
+            # if not isalign:continue
+            cframe = cvideo[i].copy()  
+            deviations = deviations_dict[i][0]
+            cjoints_2d = deviations_dict[i][1]
+
+            cframe = print_deviations(cframe, deviations, w=100)
+            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)
+
+            cframe = cv2.putText(cframe, "Frame: " + str(i), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), 2, cv2.LINE_AA)
+            cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
+
+            video_writer.write(cframe)
+            cv2.imshow('output ', cframe)
             cv2.waitKey(-1)
 
     video_writer.release()

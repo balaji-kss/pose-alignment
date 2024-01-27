@@ -29,7 +29,6 @@ def check_valid(part):
 
     assert part.shape[0] == 3
 
-    
 
 def interpolate_aligns(pairs):
 
