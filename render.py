@@ -285,58 +285,36 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
 
     video_writer.release()
 
-def get_rs_base_cand_shape(base_shape, cand_shape):
-
-    bh, bw = base_shape[:2]
-    ch, cw = cand_shape[:2]
-
-    min_h = min(bh, ch)
-    bh_, bw_ = min_h, bw * min_h / bh
-    ch_, cw_ = min_h, cw * min_h / ch
-
-    return [int(bh_), int(bw_)], [int(ch_), int(cw_)]
-
 def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, thresh):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
-    bshape, cshape = get_rs_base_cand_shape(bvideo[0].shape, cvideo[0].shape)
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
     video_writer = cv2.VideoWriter(output_video_path,
                                 fourcc, cvideo.fps, (1080, 540))
+
+    min_len = min(len(base_dict), len(deviations_dict))
     
-    num_cframes = len(deviations_dict)
-    num_bframes = len(base_dict)
-    max_len = max(num_bframes, num_cframes)
-    # pad_bframe = np.zeros((bshape[0], bshape[1], 3), dtype = np.uint8)
-    # pad_cframe = np.zeros((cshape[0], cshape[1], 3), dtype = np.uint8)
+    bids = utils.pick_equidistant_elements(list(base_dict.keys()), min_len)
+    cids = utils.pick_equidistant_elements(list(deviations_dict.keys()), min_len)
 
-    for i in range(max_len):
+    for bidx, cidx in zip(bids, cids):
         
-        if i < num_bframes:
-            bframe = bvideo[i].copy()
-            deviations = base_dict[i][0]
-            bjoints_2d = base_dict[i][1]
-            bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
-            # bframe = cv2.resize(bframe, (bshape[1], bshape[0]))
-        # else:
-        #     bframe = pad_bframe
-
-        if i < num_cframes:
-            cframe = cvideo[i].copy()
-            deviations = deviations_dict[i][0]
-            cjoints_2d = deviations_dict[i][1]
-            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)
-            # cframe = cv2.resize(cframe, (cshape[1], cshape[0]))
-        # else:
-        #     cframe = pad_cframe
+        bframe = bvideo[bidx].copy()
+        deviations = base_dict[bidx][0]
+        bjoints_2d = base_dict[bidx][1]
+        bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
+                
+        cframe = cvideo[cidx].copy()
+        deviations = deviations_dict[cidx][0]
+        cjoints_2d = deviations_dict[cidx][1]
+        cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)    
         
         bframe, cframe, _ = crop_images(bframe, cframe)
         concat = np.hstack((bframe, cframe))
         concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
-        print('concat shape ', concat.shape)
         video_writer.write(concat)
 
         cv2.imshow('output ', concat)
