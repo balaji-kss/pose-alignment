@@ -15,6 +15,13 @@ colors = [[(0, 255, 0)], [(0, 255, 0), (0, 103, 255)], [(0, 103, 255)], [(0, 103
 
 # get_color_helper is same as defined here: https://github.com/tumeke-tech/cpu-compute/blob/f1e98662db2bb4a4624b5feda82ff975e82781ee/helpers/videos/render.py#L114
 
+skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["Right hip", "Right shoulder"],
+                   ["Right shoulder", "Right elbow"], ["Left shoulder", "Left elbow"], ["Right elbow", "Right wrist"],
+                   ["Left elbow", "Left wrist"], ["Left knee", "Left ankle"], ["Left shoulder", "Neck"],
+                   ["Neck", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
+                   ["Left hip", "Left knee"], ["Right ankle", "Right heel"], ["Right ankle", "Right toe"],
+                   ["Left ankle", "Left heel"], ["Left ankle", "Left toe"], ["Neck", "Head"]]
+
 def getColor(joints, deviations):
 
     if (joints == ["Left hip", "Left shoulder"] or \
@@ -94,3 +101,7 @@ def read_joint_files(deviations, bin_path):
 ###  7 - right thigh angle deviation
 ###  8 - left leg angle deviation
 ###  9 - right leg angle deviation
+
+# num_people = 1
+# num_items_per_frame = 10
+# [num_people, num_items_per_frame, json_colors_version, reserved] + [angle_deviations] * num_candidate_frames

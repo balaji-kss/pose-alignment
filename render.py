@@ -215,17 +215,18 @@ def print_deviations(frame, deviations, w=500):
     
     return frame
 
-def crop_images(bframe, cframe, dtwframe):
+def crop_images(bframe, cframe, dtwframe=None):
 
     bh, bw = bframe.shape[:2]
     ch, cw = cframe.shape[:2]
-    dh, dw = dtwframe.shape[:2]
-
+    
     sz = np.min([bh, bw, ch, cw])
     bframe = bframe[bh//2 - sz//2 : bh//2 + sz//2, bw//2 - sz//2 : bw//2 + sz//2]
     cframe = cframe[ch//2 - sz//2 : ch//2 + sz//2, cw//2 - sz//2 : cw//2 + sz//2]
 
-    dtwframe = dtwframe[dh//2 - sz//2 : dh//2 + sz//2, dw//2 - sz//2 : dw//2 + sz//2]
+    if dtwframe:
+        dh, dw = dtwframe.shape[:2]
+        dtwframe = dtwframe[dh//2 - sz//2 : dh//2 + sz//2, dw//2 - sz//2 : dw//2 + sz//2]
 
     return bframe, cframe, dtwframe 
 
@@ -284,7 +285,66 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
 
     video_writer.release()
 
-def render_video(cvideo_path, output_video_path, deviations_dict, thresh):
+def get_rs_base_cand_shape(base_shape, cand_shape):
+
+    bh, bw = base_shape[:2]
+    ch, cw = cand_shape[:2]
+
+    min_h = min(bh, ch)
+    bh_, bw_ = min_h, bw * min_h / bh
+    ch_, cw_ = min_h, cw * min_h / ch
+
+    return [int(bh_), int(bw_)], [int(ch_), int(cw_)]
+
+def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, thresh):
+
+    bvideo = mmcv.VideoReader(bvideo_path)
+    cvideo = mmcv.VideoReader(cvideo_path)
+    bshape, cshape = get_rs_base_cand_shape(bvideo[0].shape, cvideo[0].shape)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+    video_writer = cv2.VideoWriter(output_video_path,
+                                fourcc, cvideo.fps, (1080, 540))
+    
+    num_cframes = len(deviations_dict)
+    num_bframes = len(base_dict)
+    max_len = max(num_bframes, num_cframes)
+    # pad_bframe = np.zeros((bshape[0], bshape[1], 3), dtype = np.uint8)
+    # pad_cframe = np.zeros((cshape[0], cshape[1], 3), dtype = np.uint8)
+
+    for i in range(max_len):
+        
+        if i < num_bframes:
+            bframe = bvideo[i].copy()
+            deviations = base_dict[i][0]
+            bjoints_2d = base_dict[i][1]
+            bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
+            # bframe = cv2.resize(bframe, (bshape[1], bshape[0]))
+        # else:
+        #     bframe = pad_bframe
+
+        if i < num_cframes:
+            cframe = cvideo[i].copy()
+            deviations = deviations_dict[i][0]
+            cjoints_2d = deviations_dict[i][1]
+            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)
+            # cframe = cv2.resize(cframe, (cshape[1], cshape[0]))
+        # else:
+        #     cframe = pad_cframe
+        
+        bframe, cframe, _ = crop_images(bframe, cframe)
+        concat = np.hstack((bframe, cframe))
+        concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
+        print('concat shape ', concat.shape)
+        video_writer.write(concat)
+
+        cv2.imshow('output ', concat)
+        cv2.waitKey(-1)
+        
+    video_writer.release()
+
+def render_cand_video(cvideo_path, output_video_path, deviations_dict, thresh):
 
     cvideo = mmcv.VideoReader(cvideo_path)
     cw, ch = cvideo.resolution
