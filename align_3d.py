@@ -495,10 +495,10 @@ if __name__ == "__main__":
         (8, 11),
     ]
 
-    file_names = ['baseline', 'candidate1']
-    act_name = "Incorrect_Lower_Galley_Carrier" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline', 'candidate']
+    act_name = "Make_Coffee"#"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
-    root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_incorrect_data/'
+    root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/'
     root_pose = root_dir + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
     output_video_path = root_pose + act_name + "_" + file_names[1] + '_falign.mov'
@@ -548,4 +548,4 @@ if __name__ == "__main__":
 
     # render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
     # render.render_cand_video(video_paths[1], output_cand_video_path, deviations_dict, conf_thresh)
-    render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, conf_thresh)
+    render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, conf_thresh, isblur=True)

@@ -109,7 +109,6 @@ def getColor(joints, deviations):
         joints == ["Left shoulder", "Thorax"] or \
         joints == ["Thorax", "Right shoulder"]):
         angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
-        angle = deviations[0]
         return get_color_helper("trunk", angle)
     
     if (joints == ["Right shoulder", "Right elbow"]):
@@ -285,7 +284,24 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
 
     video_writer.release()
 
-def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, thresh):
+def blur_face(frame, joints2d):
+
+    face_pts = joints2d[17:]
+    w, h, _ = np.max(face_pts, axis = 0) - np.min(face_pts, axis = 0)
+    cx, cy, _ = 0.5 * (np.max(face_pts, axis = 0) + np.min(face_pts, axis = 0))
+    sz = 0.5 * (w + h) * 2.5
+
+    xmin, ymin = cx - 0.5 * sz, cy - 0.5 * sz
+    xmax, ymax = cx + 0.5 * sz, cy + 0.5 * sz
+
+    xmin, ymin = int(xmin), int(ymin)
+    xmax, ymax = int(xmax), int(ymax)
+
+    frame[ymin:ymax, xmin:xmax] = cv2.GaussianBlur(frame[ymin:ymax, xmin:xmax], (51, 51), 0)
+
+    return frame
+
+def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, thresh, isblur = False):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
@@ -305,13 +321,19 @@ def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict,
         bframe = bvideo[bidx].copy()
         deviations = base_dict[bidx][0]
         bjoints_2d = base_dict[bidx][1]
-        bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
-                
+
         cframe = cvideo[cidx].copy()
         deviations = deviations_dict[cidx][0]
         cjoints_2d = deviations_dict[cidx][1]
+
+        if isblur:
+            bframe = blur_face(bframe, bjoints_2d)
+            cframe = blur_face(cframe, cjoints_2d)
+
+        bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
+                
         cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)    
-        
+
         bframe, cframe, _ = crop_images(bframe, cframe)
         concat = np.hstack((bframe, cframe))
         concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
