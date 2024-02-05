@@ -36,19 +36,50 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
                    ["Thorax", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
                    ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
+# Lower_Galley_Carrier
+# arm = [[0, 10], [10, 20], [20, 40], [40, 55], [55, sys.maxsize]]
+# leg = [[0, 5], [5, 10], [10, 25], [25, 35], [35, sys.maxsize]]
+
+# Lowering_Crew_Bag
+# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
+# leg = [[0, 10], [10, 15], [15, 25], [25, 35], [35, sys.maxsize]]
+
+# Lifting_Crew_Bag
+# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
+# leg = [[0, 5], [5, 10], [10, 25], [25, 35], [35, sys.maxsize]]
+
+# Pushing_cart
+# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
+# leg = [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]]
+
+# 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]], # Incorrect closing overhead bin, Incorrect lowering crew bag
+# 'trunk': [[0, 7.5], [7.5, 15], [15, 25], [25, 40], [40, sys.maxsize]], # Incorrect lift galley carrier, 
+# 'trunk': [[0, 5], [5.0, 10], [10, 20], [20, 30], [30, sys.maxsize]], # Incorrect lift galley carrier, 
+# 'trunk': [[0, 10], [10.0, 15], [15, 25], [25, 35], [35, sys.maxsize]], # Incorrect lift galley carrier, 
+
+# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
+arm = [[0, 20], [20, 30], [30, 45], [45, 70], [70, sys.maxsize]]
+leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 7.5], [7.5, 15], [15, 35], [35, 50], [50, sys.maxsize]]
+
 angle_bounds = {
-    # 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
-    # 'trunk': [[0, 5], [5, 10], [15, 20], [20, 25], [25, sys.maxsize]],
-    'trunk': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
-    # 'trunk': [[0, 2.5], [2.5, 7.5], [7.5, 15], [15, 20], [20, sys.maxsize]],
-    'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
-    'fore_arm': [[0, 25], [25, 50], [50, 75], [75, 100], [100, sys.maxsize]],
-    # 'fore_arm': [[0, 30], [30, 60], [60, 90], [90, 120], [120, sys.maxsize]],
-    'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
-    # 'thigh': [[0, 15], [15, 40], [40, 60], [60, 80], [80, sys.maxsize]],
-    # 'leg': [[0, 20], [20, 40], [40, 60], [60, 150], [150, sys.maxsize]],
-    'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
+    'trunk': trunk,
+    'arm': arm,  
+    'fore_arm': arm,
+    'inter_fore_arm': arm,
+    'thigh': leg,
+    'leg': leg,
 }
+
+# angle_bounds = {
+#     # 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]], # Incorrect closing overhead bin, Incorrect lowering crew bag
+#     'trunk': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]], # Incorrect lift galley carrier, 
+#     'arm': [[0, 20], [20, 40], [40, 60], [60, 80], [80, sys.maxsize]],  
+#     'fore_arm': [[0, 25], [25, 50], [50, 75], [75, 100], [100, sys.maxsize]],
+#     'inter_fore_arm': [[0, 15], [15, 30], [30, 45], [45, 60], [60, sys.maxsize]],
+#     'thigh': [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]],
+#     'leg': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]],
+# }
 
 colors = [[(0, 255, 0)], [(0, 255, 0), (0, 103, 255)], [(0, 103, 255)], [(0, 103, 255), (0, 0, 255)], [(0, 0, 255)]]
 
@@ -131,9 +162,11 @@ def getColor(joints, deviations):
         angle = deviations[6]
         return get_color_helper("thigh", angle)
     if (joints == ["Right knee", "Right ankle"]):
-        return get_color_helper("leg", deviations[9])
+        angle = deviations[9]
+        return get_color_helper("leg", angle)
     if (joints == ["Left knee", "Left ankle"]):
-        return get_color_helper("leg", deviations[8])
+        angle = deviations[8]
+        return get_color_helper("leg", angle)
     
     return (0, 255, 0)
 
@@ -177,40 +210,47 @@ def drawSkeleton(frame, joints_2d, deviations, base, thresh):
 
 def print_deviations(frame, deviations, w=500):
 
-    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev = deviations
 
     start = 100
     step = 30
-    
+    thickness = 2
+
     frame = cv2.putText(frame, "Trunk: " + str(trunk_dev), (w, start), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA) 
+                   1, (0, 0, 255), thickness, cv2.LINE_AA) 
     y = start + step
     frame = cv2.putText(frame, "Trunk Twist: " + str(trunk_twist_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA) 
+                   1, (0, 0, 255), thickness, cv2.LINE_AA) 
     y = start + 2 * step
     frame = cv2.putText(frame, "Left arm: " + str(larm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 3 * step
     frame = cv2.putText(frame, "Right arm: " + str(rarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                  1, (0, 0, 255), 1, cv2.LINE_AA)
+                  1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 4 * step
     frame = cv2.putText(frame, "Left Fore arm: " + str(lfarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 5 * step
     frame = cv2.putText(frame, "Right Fore arm: " + str(rfarm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 6 * step
     frame = cv2.putText(frame, "Left thigh: " + str(lthigh_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 7 * step
     frame = cv2.putText(frame, "Right thigh: " + str(rthigh_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 8 * step
     frame = cv2.putText(frame, "Left Leg: " + str(lleg_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     y = start + 9 * step
     frame = cv2.putText(frame, "Right leg: " + str(rleg_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
-                   1, (0, 0, 255), 1, cv2.LINE_AA)
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
+    y = start + 10 * step
+    frame = cv2.putText(frame, "Fore arm: " + str(farm_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
+    y = start + 11 * step
+    frame = cv2.putText(frame, "Across leg: " + str(fleg_dev), (w, y), cv2.FONT_HERSHEY_SIMPLEX,  
+                   1, (0, 0, 255), thickness, cv2.LINE_AA)
     
     return frame
 
@@ -223,7 +263,7 @@ def crop_images(bframe, cframe, dtwframe=None):
     bframe = bframe[bh//2 - sz//2 : bh//2 + sz//2, bw//2 - sz//2 : bw//2 + sz//2]
     cframe = cframe[ch//2 - sz//2 : ch//2 + sz//2, cw//2 - sz//2 : cw//2 + sz//2]
 
-    if dtwframe:
+    if dtwframe is not None:
         dh, dw = dtwframe.shape[:2]
         dtwframe = dtwframe[dh//2 - sz//2 : dh//2 + sz//2, dw//2 - sz//2 : dw//2 + sz//2]
 
@@ -256,8 +296,8 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
 
             bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
 
-            cframe = print_deviations(cframe, deviations)
             cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)
+            cframe = print_deviations(cframe, deviations)
 
             if isalign:text = "   ALIGNED"
             else:text = "  NOT-ALIGNED"

@@ -153,6 +153,87 @@ def get_right_farm_dev(base_joints_3d, cand_joints_3d):
 
     return np.round(diff_angle, 2)
 
+def get_left_shoulder_wrist_vector(joints_3d):
+
+    lshoulder = joints_3d[11]
+    lwrist = joints_3d[13]
+
+    larm_vector = _normalize(lwrist - lshoulder)  
+
+    return larm_vector, [lwrist, lshoulder]
+
+def get_right_shoulder_wrist_vector(joints_3d):
+
+    rshoulder = joints_3d[14]
+    rwrist = joints_3d[16]
+
+    rarm_vector = _normalize(rwrist - rshoulder)  
+
+    return rarm_vector, [rwrist, rshoulder]
+
+def get_left_hip_ankle_vector(joints_3d):
+
+    lhip = joints_3d[4]
+    lankle = joints_3d[6]
+
+    lleg_vector = _normalize(lankle - lhip)  
+
+    return lleg_vector, [lankle, lhip]
+
+def get_right_hip_ankle_vector(joints_3d):
+
+    rhip = joints_3d[1]
+    rankle = joints_3d[3]
+
+    rleg_vector = _normalize(rankle - rhip)  
+
+    return rleg_vector, [rankle, rhip]
+
+def get_leg_dev(base_joints_3d, cand_joints_3d):
+
+    blhakl_vector, _ = get_left_hip_ankle_vector(base_joints_3d)
+    clhakl_vector, _ = get_left_hip_ankle_vector(cand_joints_3d)
+
+    brhakl_vector, _ = get_right_hip_ankle_vector(base_joints_3d)
+    crhakl_vector, _ = get_right_hip_ankle_vector(cand_joints_3d)
+
+    base_angle = np.arccos(np.dot(blhakl_vector, brhakl_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(clhakl_vector, crhakl_vector)) * 180.0 / np.pi
+    
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
+def get_farm_dev(base_joints_3d, cand_joints_3d):
+
+    blshwr_vector, _ = get_left_shoulder_wrist_vector(base_joints_3d)
+    clshwr_vector, _ = get_left_shoulder_wrist_vector(cand_joints_3d)
+
+    brshwr_vector, _ = get_right_shoulder_wrist_vector(base_joints_3d)
+    crshwr_vector, _ = get_right_shoulder_wrist_vector(cand_joints_3d)
+
+    base_angle = np.arccos(np.dot(blshwr_vector, brshwr_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(clshwr_vector, crshwr_vector)) * 180.0 / np.pi
+
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
+def get_farm_dev_0(base_joints_3d, cand_joints_3d):
+
+    blfarm_vector, _ = get_left_forearm_vector(base_joints_3d)
+    clfarm_vector, _ = get_left_forearm_vector(cand_joints_3d)
+
+    brfarm_vector, _ = get_right_forearm_vector(base_joints_3d)
+    crfarm_vector, _ = get_right_forearm_vector(cand_joints_3d)
+
+    base_angle = np.arccos(np.dot(blfarm_vector, brfarm_vector)) * 180.0 / np.pi
+    cand_angle = np.arccos(np.dot(clfarm_vector, crfarm_vector)) * 180.0 / np.pi
+
+    diff_angle = abs(cand_angle - base_angle)
+
+    return np.round(diff_angle, 2)
+
 def get_right_arm_dev(base_joints_3d, cand_joints_3d):
 
     brarm_vector, _ = get_right_arm_vector(base_joints_3d)

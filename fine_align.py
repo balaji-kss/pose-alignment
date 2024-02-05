@@ -337,24 +337,24 @@ def get_matching(bvideo, cvideo, out_video_path, bposes_3d, cposes_3d):
 
 if __name__ == "__main__":
 
-    bact_name =  'Stowing_carrier' # 'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
-    cact_name =  'Stowing_carrier'
+    bact_name =  'Serving_from_Basket' # 'Lower_Galley_Carrier' # 'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' # Stowing_carrier # 'Removing_Item_from_Bottom_of_Cart'
+    cact_name =  'Serving_from_Basket'
     # ["baseline.mov", "candidate.mov"]
 
-    root_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/'
+    root_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     base_path = root_path + bact_name
     cand_path = root_path + cact_name
     
-    bvideo_path = base_path + "/videos/baseline.mov"
-    cvideo_path = cand_path + "/videos/candidate.mov"
+    bvideo_path = base_path + "/videos/baseline14.mov"
+    cvideo_path = cand_path + "/videos/candidate1.mov"
 
     out_video_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/' + bact_name + '_' + cact_name + '_align.mov'
 
     bpose_path = root_path + bact_name + '/poses/joints/'
     cpose_path = root_path + cact_name + '/poses/joints/'
 
-    bpose_path_3d = bpose_path + "baseline_pose_3d.p"
-    cpose_path_3d = cpose_path + "candidate_pose_3d.p"
+    bpose_path_3d = bpose_path + "baseline14_pose_3d.p"
+    cpose_path_3d = cpose_path + "candidate1_pose_3d.p"
 
     bnormal_folder = base_path + '/videos/normalized_video/'
     cnormal_folder = cand_path + '/videos/normalized_video/'
@@ -396,8 +396,8 @@ if __name__ == "__main__":
 
     distance_np, dtw_path = get_pmpjpe_align(bvideo, cvideo, bposes_3d, cposes_3d)
 
-    template_name  = "baseline" 
-    candidate_name = "candidate" 
+    template_name  = "baseline14" 
+    candidate_name = "candidate1" 
     task_path = base_path
     pose_win_sec = 0.3
 

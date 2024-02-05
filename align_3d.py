@@ -92,7 +92,7 @@ def align_candidate_pose_up(base_3d_joints, cand_3d_joints):
 def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=False):
 
     if np.all(base_joints_3d == 0.0) or np.all(cand_joints_3d == 0.0):
-        return [0] * 10
+        return [0] * 12
 
     base_joints_3d, cand_joints_3d, _ = procrustes(base_joints_3d, cand_joints_3d)
 
@@ -124,7 +124,9 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     rleg_dev = ca.get_right_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
 
-    if False:
+    fleg_dev = ca.get_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
+
+    if vis:
         low_idxs = list(range(0, 7))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_low, colors[0], shiftx=0.50, idxs = low_idxs)
 
@@ -144,7 +146,9 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     rfarm_dev = ca.get_right_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
 
-    if vis:
+    farm_dev = ca.get_farm_dev(base_joints_aligned_up, cand_joints_aligned_up)
+
+    if False:
         up_idxs = list(range(11, 17))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_up, colors[0], shiftx=0.0, idxs = up_idxs)
 
@@ -153,18 +157,18 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
         vis_vector(ax2, base_joints_aligned_up, shiftx=0.0)
         vis_vector(ax2, cand_joints_aligned_up, shiftx=0.0)
 
-    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
+    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev]
 
 def vis_vector(ax, joints_3d_org, shiftx=0.0):
 
     joints_3d = joints_3d_org.copy()
     joints_3d[:, 0] += shiftx
-    # _, pts = ca.get_right_forearm_vector(joints_3d)
-    # s, e = pts
+    _, pts = ca.get_left_hip_ankle_vector(joints_3d)
+    s, e = pts
 
-    # ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
+    ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
 
-    _, pts = ca.get_left_arm_vector(joints_3d)
+    _, pts = ca.get_right_hip_ankle_vector(joints_3d)
     s, e = pts
 
     ax.plot([-s[0], -e[0]], [s[1], e[1]], [s[2], e[2]], 'o-', color='blue')
@@ -194,9 +198,9 @@ def valid_dev(dev, bjoints_2d, cjoints_2d, idxs, thresh):
 def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
 
     # NOTE: check mask for trunk
-    # NOTE: get neck angle
+    # NOTE: check mask for inter_fore_arm
 
-    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
+    trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev = deviations
 
     larm_dev = valid_dev(larm_dev, bjoints_2d, cjoints_2d, [11, 12], thresh=thresh)
     rarm_dev = valid_dev(rarm_dev, bjoints_2d, cjoints_2d, [14, 15], thresh=thresh)
@@ -210,7 +214,27 @@ def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
     lleg_dev = valid_dev(lleg_dev, bjoints_2d, cjoints_2d, [4, 5, 6], thresh=thresh)
     rleg_dev = valid_dev(rleg_dev, bjoints_2d, cjoints_2d, [1, 2, 3], thresh=thresh)
 
-    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev]
+    # # Max across left arm
+    max_larm = max(larm_dev, farm_dev)
+    if max_larm > lfarm_dev:
+        larm_dev, lfarm_dev = max_larm, max_larm
+    else:
+        larm_dev, lfarm_dev = max_larm, lfarm_dev
+        
+    # # Max across right arm
+    max_rarm = max(rarm_dev, farm_dev)
+    if max_rarm > lfarm_dev:
+        rarm_dev, rfarm_dev = max_rarm, max_rarm
+    else:
+        rarm_dev, rfarm_dev = max_rarm, rfarm_dev
+
+    max_lleg = max(lthigh_dev, fleg_dev)
+    lthigh_dev, lleg_dev = max_lleg, lleg_dev
+    
+    max_rleg = max(rthigh_dev, fleg_dev)
+    rthigh_dev, rleg_dev = max_rleg, rleg_dev
+
+    return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev]
 
 def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out_pkl, vis=False):
 
@@ -236,8 +260,11 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     # # tb, tc = 178, 174 #Lift_Galley_Carrier
     # # tb, tc = 231, 271 #Stow_Full_Cart
     # path_ids = create_path_ids(tb, tc, pad=5)
+
     max_bidx, max_cidx = 0, 0
     for t, (b, c, isalign) in enumerate(path_ids):
+
+        # if c < 91:continue
 
         max_cidx = max(max_cidx, c)
         max_bidx = max(max_bidx, b)
@@ -267,7 +294,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             ctid = 0
             csjoints_2d = np.zeros((23, 3), dtype="float")
 
-        if not (btid == ctid and btid == req_tid): continue
+        # if not (btid == ctid and btid == req_tid): continue
 
         if vis:
 
@@ -289,13 +316,14 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
         if not vis:ax2=None
 
         deviations = cal_dev(bjoints_3d, cjoints_3d, bjoints_2d, cjoints_2d, ax2=ax2, vis=vis)
+
         deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh=conf_thresh)
 
         deviations_lst.append({'deviations':deviations, 'cjoints_2d':csjoints_2d, 'bjoints_2d':bsjoints_2d})
 
         if vis:
-            trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev = deviations
-            ax2.set_title(f"trunk: {trunk_dev} \n trunk twist: {trunk_twist_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n")
+            trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev = deviations
+            ax2.set_title(f"trunk: {trunk_dev} \n trunk twist: {trunk_twist_dev} \n larm_dev: {larm_dev} \n rarm_dev: {rarm_dev} \n lfarm_dev: {lfarm_dev} \n rfarm_dev: {rfarm_dev} \n lthigh_dev: {lthigh_dev} \n rthigh_dev: {rthigh_dev} \n lleg_dev: {lleg_dev} \n rleg_dev: {rleg_dev} \n farm_dev: {farm_dev} \n fleg_dev: {fleg_dev} \n")
 
             frame1 = cv2.putText(frame1, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 2, cv2.LINE_AA)
@@ -321,7 +349,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
 
             plt.tight_layout()
             plt.pause(0.00001)
-            # plt.pause(5)
+            # plt.pause(1)
             # plt.show()
 
     deviations_lst = avg_non_align(path_ids, deviations_lst)
@@ -337,7 +365,8 @@ def avg_non_align_segment(deviation_info_lst):
     
     deviations_np = create_np(deviation_info_lst, name="deviations")
 
-    avg_dev = np.nanmean(deviations_np, axis = 0).tolist()
+    # avg_dev = np.nanmean(deviations_np, axis = 0).tolist()
+    avg_dev = np.nanquantile(deviations_np, 0.85, axis = 0).tolist()
     
     avg_dev = np.round(avg_dev, 2)
 
@@ -388,7 +417,10 @@ def nan_helper(y):
 
 def filter_nans(y):
     nans, x = nan_helper(y)
+    if len(x(~nans)) == 0 or len(y[~nans]) == 0:return y
+
     y[nans] = np.interp(x(nans), x(~nans), y[~nans])
+
     return y
 
 def window_mean_angle_dev(deviations_np, window_size):
@@ -495,15 +527,16 @@ if __name__ == "__main__":
         (8, 11),
     ]
 
-    file_names = ['baseline', 'candidate']
-    act_name = "Make_Coffee"#"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline14', 'candidate1']
+    act_name = "Lowering_Crew_Bag" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
-    root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/Customer_Facing_Demos/'
+    root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
-    output_video_path = root_pose + act_name + "_" + file_names[1] + '_falign.mov'
-    output_cand_video_path = root_pose + act_name + "_" + file_names[1] + '.mov'
-    output_compare_video_path = root_pose + act_name + "_" + file_names[1] + '_fc.mov'
+    save_vname = root_pose + act_name + "_" + file_names[0] + "_" + file_names[1]
+    output_video_path = save_vname + '_falign.mov'
+    output_cand_video_path = save_vname + '.mov'
+    output_compare_video_path = save_vname + '_fc.mov'
     dtw_video_path = root_pose + file_names[0] + "_" + file_names[1] + "_alignment.mp4"
     colors = ['red', 'green', 'black', 'orange', 'blue']
     req_tid = 0
@@ -546,6 +579,6 @@ if __name__ == "__main__":
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)
 
-    # render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
+    render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
     # render.render_cand_video(video_paths[1], output_cand_video_path, deviations_dict, conf_thresh)
-    render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, conf_thresh, isblur=True)
+    # render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, conf_thresh, isblur=False)

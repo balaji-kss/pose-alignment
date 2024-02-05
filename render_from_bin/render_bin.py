@@ -64,8 +64,8 @@ def getColor(joints, deviations):
     if (joints == ["Left hip", "Left shoulder"] or \
         joints == ["Right hip", "Left hip"] or \
         joints == ["Right hip", "Right shoulder"] or \
-        joints == ["Left shoulder", "Thorax"] or \
-        joints == ["Thorax", "Right shoulder"]):
+        joints == ["Left shoulder", "Neck"] or \
+        joints == ["Neck", "Right shoulder"]):
         angle = math.sqrt(deviations[0]**2 + deviations[1]**2)
         return get_color_helper("trunk", angle)
     
@@ -135,9 +135,9 @@ def valid_head_point(joints, thresh):
 
     return True
 
-def drawSkeleton(frame, joints_2d, deviations, base, thresh):
+def drawSkeleton(frame, joints_2d, deviations, base, thresh, scales):
 
-    sx, sy = 1080, 1920
+    sx, sy = scales
 
     for pair in skeletonMapping:
         startPoint = get_point(joints_2d, pair[0])
@@ -168,10 +168,10 @@ def render_video(base_info, cand_info, deviations):
     print('num_bframes ', num_bframes)
     print('num_cframes ', num_cframes)
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     # Define video writer
-    video_writer = cv2.VideoWriter(out_video_path,
-                                fourcc, cvideo.fps, (1080, 960))
+    # video_writer = cv2.VideoWriter(out_video_path,
+    #                             fourcc, cvideo.fps, (1080, 960))
     
     min_len = min(num_bframes, num_cframes)
 
@@ -187,30 +187,34 @@ def render_video(base_info, cand_info, deviations):
         bjoint_2d = bjoints_2d[bidx]
         deviation = deviations[cidx]
 
-        bframe = drawSkeleton(bframe, bjoint_2d, deviation, base=True, thresh=conf_thresh)
-                
         cframe = cand_video[cidx].copy()
         cjoint_2d = cjoints_2d[cidx]
-        cframe = drawSkeleton(cframe, cjoint_2d, deviation, base=False, thresh=conf_thresh)
+
+        bscales = [bframe.shape[1], bframe.shape[0]]
+        cscales = [cframe.shape[1], cframe.shape[0]]
+
+        bframe = drawSkeleton(bframe, bjoint_2d, deviation, base=True, thresh=conf_thresh, scales = bscales)
+        cframe = drawSkeleton(cframe, cjoint_2d, deviation, base=False, thresh=conf_thresh, scales = cscales)
         deviation = np.round(deviation, 2)    
         cframe = utils.print_deviations(cframe, deviation)
 
         bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
         cframe = cv2.resize(cframe, None, fx = 0.5, fy = 0.5)
 
-        concat = np.hstack((bframe, cframe))
+        # concat = np.hstack((bframe, cframe))
         
-        print('concat ', concat.shape)
-        video_writer.write(concat)
+        # print('concat ', concat.shape)
+        # video_writer.write(concat)
 
-        cv2.imshow('concat ', concat)
+        cv2.imshow('bframe ', bframe)
+        cv2.imshow('cframe ', cframe)
         cv2.waitKey(-1)
 
-    video_writer.release()
+    # video_writer.release()
 
 if __name__ == "__main__":
 
-    root_pose = "/home/tumeke-balaji/Documents/results/delta/bin_files/"
+    root_pose = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/app_side/removing_item/"
     base_dir = root_pose + "/baseline/"
     cand_dir = root_pose + "/candidate/"
     dev_path = root_pose + "deviations.bin"

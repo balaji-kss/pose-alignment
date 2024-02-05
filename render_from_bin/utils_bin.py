@@ -61,11 +61,14 @@ def read_dev_file(deviations, bin_path):
 
     f = open(bin_path, "rb")
     num_frames = 0
-    header_len = 4 * 4
+    header_len = 20
     byte_arr = f.read(header_len)
-    header = np.frombuffer(byte_arr, dtype=np.float32).tolist()
+    header = np.frombuffer(byte_arr, dtype=np.int8).tolist()
+    print('header ', header)
     num_people = int(header[0])
     num_angles_per_person = int(header[1]) * 4
+    print('num_people ', num_people)
+    print('num_angles_per_person ', num_angles_per_person)
 
     while True:
         for j in range(num_people):
