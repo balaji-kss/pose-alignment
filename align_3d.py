@@ -229,10 +229,16 @@ def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
         rarm_dev, rfarm_dev = max_rarm, rfarm_dev
 
     max_lleg = max(lthigh_dev, fleg_dev)
-    lthigh_dev, lleg_dev = max_lleg, lleg_dev
-    
+    if max_lleg > lleg_dev:
+        lthigh_dev, lleg_dev = max_lleg, max_lleg
+    else:
+        lthigh_dev, lleg_dev = max_lleg, lleg_dev
+
     max_rleg = max(rthigh_dev, fleg_dev)
-    rthigh_dev, rleg_dev = max_rleg, rleg_dev
+    if max_rleg > rleg_dev:
+        rthigh_dev, rleg_dev = max_rleg, max_rleg
+    else:
+        rthigh_dev, rleg_dev = max_rleg, rleg_dev
 
     return [trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev]
 

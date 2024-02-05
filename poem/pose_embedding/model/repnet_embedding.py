@@ -59,15 +59,13 @@ class SelfSimilarityProbDistance(torch.nn.Module):
             row_indices, col_indices = np.meshgrid(np.arange(num_chunks), np.arange(num_chunks))
 
             for (r, c) in zip(row_indices.ravel(), col_indices.ravel()):
-                # if torch.cuda.is_available():
-                #     torch.cuda.empty_cache()                
-                # Expand dimensions
-                a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1).unsqueeze(2)  # [N, 1, 1, 8, 320]
-                b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0).unsqueeze(3)  # [1, N, 8, 1, 320]
+                # Expand dimensions for the first dimension
+                a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1)  # [N, 1, 8, 320]
+                b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0)  # [1, N, 8, 320]
                 # Compute sequence-to-sequence distances
-                distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8, 8]
+                distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8]
                 # Average over the sequence length dimensions to get the sequence-to-sequence distances
-                distances = torch.mean(distances, dim=[-1,-2])  # This will be [N, N]
+                distances = torch.mean(distances, dim=[-1])  # This will be [N, N]
                 tsm[r*self.chunk_size:(r+1)*self.chunk_size, c*self.chunk_size:(c+1)*self.chunk_size] = distances
             # set padding data as very large number, eg 1e10
             tsm[~mask_2d] = 1e10
@@ -101,16 +99,14 @@ class SelfSimilarityProbDistance(torch.nn.Module):
 
             row_indices, col_indices = np.meshgrid(np.arange(num_chunks), np.arange(num_chunks))
 
-            for (r, c) in zip(row_indices.ravel(), col_indices.ravel()):
-                # if torch.cuda.is_available():
-                #     torch.cuda.empty_cache()                
-                # Expand dimensions
-                a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1).unsqueeze(2)  # [N, 1, 1, 8, 320]
-                b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0).unsqueeze(3)  # [1, N, 8, 1, 320]
+            for (r, c) in zip(row_indices.ravel(), col_indices.ravel()):              
+                # Expand dimensions for the first dimension
+                a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1)  # [N, 1, 8, 320]
+                b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0)  # [1, N, 8, 320]
                 # Compute sequence-to-sequence distances
-                distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8, 8]
+                distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8]
                 # Average over the sequence length dimensions to get the sequence-to-sequence distances
-                distances = torch.mean(distances, dim=[-1,-2])  # This will be [N, N]
+                distances = torch.mean(distances, dim=[-1])  # This will be [N, N]
                 tsm[r*self.chunk_size:(r+1)*self.chunk_size, c*self.chunk_size:(c+1)*self.chunk_size] = distances
             # Apply the softmax function
             tsm[~mask_2d] = 0.0
@@ -201,31 +197,50 @@ class CrossSimilarityProbDistance(SelfSimilarityProbDistance):
         Nx = X.shape[0] # X # [Nx, 8, 320]
         Ny = Y.shape[0] # Y # [Ny, 8, 320]
 
-        a_exp = X.unsqueeze(1).unsqueeze(2)  # [Nx, 1, 1, 8, 320]
-        b_exp = Y.unsqueeze(0).unsqueeze(3)  # [1, Ny, 8, 1, 320]
+        a_exp = X.unsqueeze(1)  # [Nx, 1, 8, 320]
+        b_exp = Y.unsqueeze(0)  # [1, Ny, 8, 320]
         # Compute sequence-to-sequence distances
-        distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b, self.smoothing)  # This should be [N, N, 8, 8]
+        distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b, self.smoothing)  # This should be [N, N, 8]
         # Average over the sequence length dimensions to get the sequence-to-sequence distances
-        distances = torch.mean(distances, dim=[-1,-2])  # This will be [N, N]
+        distances = torch.mean(distances, dim=[-1])  # This will be [N, N]
         
         return distances
-    
-class CrossFrameSimilarityProbDistance(SelfSimilarityProbDistance):
-    def __init__(self, device, raw_a=4.0335, raw_b=14.0885, smoothing=0.1, path='data/output/vis'):
-        super(CrossFrameSimilarityProbDistance, self).__init__(device, raw_a, raw_b, smoothing, path)
-    
-    def forward(self, X, Y):
-        Nx = X.shape[0] # X # [Nx, 8, 320]
-        Ny = Y.shape[0] # Y # [Ny, 8, 320]
 
-        a_exp = X.unsqueeze(1).unsqueeze(2)  # [Nx, 1, 1, 8, 320]
-        b_exp = Y.unsqueeze(0).unsqueeze(3)  # [1, Ny, 8, 1, 320]
-        # Compute sequence-to-sequence distances
-        distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b, self.smoothing)  # This should be [N, N, 8, 8]
-        # Average over the sequence length dimensions to get the sequence-to-sequence distances
-        distances = torch.mean(distances, dim=[-1,-2])  # This will be [N, N]
+class DivideConquerCrossSimilarityProbDistance(SelfSimilarityProbDistance):
+    def __init__(self, device, raw_a=4.0335, raw_b=14.0885, smoothing=0.1, path='data/output/vis', chunk_size=128):
+        super(DivideConquerCrossSimilarityProbDistance, self).__init__(device, raw_a, raw_b, smoothing, path)
+        self.chunk_size = chunk_size    # chunk_size = 128: 2G GPU mem
+        self.CSP = CrossSimilarityProbDistance(device=device, raw_a=raw_a, raw_b=raw_b, smoothing=smoothing)
+    
+    def forward(self, seq_embedding_x, seq_embedding_y):
+        M = seq_embedding_x.shape[0]
+        N = seq_embedding_y.shape[0]
+
+        num_chunks_x = M // self.chunk_size + 1
+        num_chunks_y = N // self.chunk_size + 1
+        padding_M = (num_chunks_x) * self.chunk_size
+        padding_N = (num_chunks_y) * self.chunk_size
+
+        x_padding_shape = [padding_M, *seq_embedding_x.shape[1:]]
+        y_padding_shape = [padding_N, *seq_embedding_y.shape[1:]]
+
+        seq_embedding_x_padding = seq_embedding_x.new_full(x_padding_shape, 0.0)
+        seq_embedding_x_padding[:seq_embedding_x.shape[0], ...].copy_(seq_embedding_x)
+
+        seq_embedding_y_padding = seq_embedding_y.new_full(y_padding_shape, 0.0)
+        seq_embedding_y_padding[:seq_embedding_y.shape[0], ...].copy_(seq_embedding_y)
+
+        padding_dist_mat =  torch.zeros([padding_M, padding_N], device=seq_embedding_x.device)
+
+        row_indices, col_indices = np.meshgrid(np.arange(num_chunks_x), np.arange(num_chunks_y))
+        for (r, c) in zip(row_indices.ravel(), col_indices.ravel()):
+            X = seq_embedding_x_padding[r*self.chunk_size:(r+1)*self.chunk_size]
+            Y = seq_embedding_y_padding[c*self.chunk_size:(c+1)*self.chunk_size]
+            dist = self.CSP(X, Y)
+            padding_dist_mat[r*self.chunk_size:(r+1)*self.chunk_size, c*self.chunk_size:(c+1)*self.chunk_size] = dist
+        distances_mat_dc = padding_dist_mat[:M, :N]
+        return distances_mat_dc
         
-        return distances    
 
 class RepNetEmbedding(nn.Module):
     """

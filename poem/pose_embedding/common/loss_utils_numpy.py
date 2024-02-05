@@ -21,6 +21,9 @@ def get_sigmoid_parameters(raw_a, raw_b, a_range=(None, None), b_range=(None, No
 
     return a, raw_b
 
+def get_raw_sigmoid_parameters(sigmoid_a, sigmoid_b):
+    return sigmoid_a-1, sigmoid_b
+
 """
 This function is used for CPU which is equaivalient to the training CUDA version
 Note that we use this metric for ANN search, so we flatten the [k, 16] into [k*16] vector,
@@ -38,12 +41,12 @@ def probabilistic_distance(A, B, sigmoid_a=1, sigmoid_b=0):
             p = (1.0 - smoothing) * p + smoothing / 2.0
         return p    
     # Reshape A and B to [..., 20, 16]
-    A_reshaped = A.reshape(*A.shape[:-1], 20, 16)
-    B_reshaped = B.reshape(*B.shape[:-1], 20, 16)    
+    A_reshaped = A.reshape(*A.shape[:-1], 20, 1, 16)
+    B_reshaped = B.reshape(*B.shape[:-1], 1, 20, 16)    
     # Compute pairwise L2 distances
     distances = np.linalg.norm(A_reshaped - B_reshaped, axis=-1)    
 
     # Apply the scaled sigmoid function
     distances = scaled_sigmoid(distances, sigmoid_a, sigmoid_b)
     
-    return -np.log(np.mean(distances, axis=-1))
+    return -np.log(np.mean(distances, axis=(-1, -2)))

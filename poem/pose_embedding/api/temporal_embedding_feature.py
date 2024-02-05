@@ -81,3 +81,51 @@ def extract_embedding_temporal_feature(embeddings, track_id=0,
         cand_e += stride
     seq_embedding = np.stack(seq_embedding_list)
     return seq_embedding
+
+"""
+This version is used for the rewritten version of embedding file by cpu-compute.
+CPU-compute rewrite the embedding file by reorganizing the embeddings vectors person by person. 
+"""
+def extract_embedding_temporal_feature_rewrite(embeddings, track_id=0, 
+                                       win_size_sec=0.5, stride_sec=0.25, win_size_frames=8):
+    if track_id >= len(embeddings):
+        print(f"Error: track_id {track_id} is out of range of the embedding file!")
+        return None
+    person_embedding = embeddings[track_id]
+    fps = person_embedding['metadata'].get("fps", 30)
+    stride = max(1, int(fps * stride_sec))  # if stride_sec==0, simply use frame-wise
+    cand_s, cand_e = 0, max(1, int(fps * win_size_sec)) # if win_size_sec==0, simply use frame-wise
+
+    if cand_e - cand_s == 1:
+        win_size_frames = 1
+
+    seq_embedding_list = []
+    embedding_list = person_embedding['data']
+    
+    while cand_e < len(embedding_list):
+        sequence_b = embedding_list[cand_s:cand_e]
+        sequence_b_list = []
+        for em in sequence_b:
+            if em is not None and constants.KEY_EMBEDDING_SAMPLES in em: 
+                sequence_b_list.append(em[constants.KEY_EMBEDDING_SAMPLES])
+            else:
+                sequence_b_list.append(np.zeros(embedding_shape))
+
+        # padding the missing pose (np.zeros) by using 
+        # sequence_b_list = fill_missing_data(sequence_b_list)
+        sequence_b = np.stack(sequence_b_list, axis=0)
+        sequence_b = sequence_b.reshape(sequence_b.shape[0], -1)
+        # down-sampling the template if pose_win_template > alignment_win
+        if cand_e-cand_s > win_size_frames: # subsampling
+            sampling_idx = np.linspace(0, cand_e-cand_s-1, win_size_frames).astype(int)
+            sequence_b = sequence_b[sampling_idx]
+        elif cand_e-cand_s < win_size_frames: # padding the last frame
+            sequence_b = pad_array(sequence_b, win_size_frames)
+
+        seq_embedding_list.append(sequence_b)
+
+        cand_s += stride
+        cand_e += stride
+    seq_embedding = np.stack(seq_embedding_list)
+    return seq_embedding
+

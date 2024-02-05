@@ -58,7 +58,7 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
 # 'trunk': [[0, 10], [10.0, 15], [15, 25], [25, 35], [35, sys.maxsize]], # Incorrect lift galley carrier, 
 
 # arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-arm = [[0, 20], [20, 30], [30, 45], [45, 70], [70, sys.maxsize]]
+arm = [[0, 20], [20, 30], [30, 80], [80, 120], [120, sys.maxsize]]
 leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
 trunk = [[0, 7.5], [7.5, 15], [15, 35], [35, 50], [50, sys.maxsize]]
 
@@ -208,11 +208,11 @@ def drawSkeleton(frame, joints_2d, deviations, base, thresh):
     
     return frame
 
-def print_deviations(frame, deviations, w=500):
+def print_deviations(frame, deviations, w=100):
 
     trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev = deviations
 
-    start = 100
+    start = 600
     step = 30
     thickness = 2
 

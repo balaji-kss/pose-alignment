@@ -128,7 +128,8 @@ def visualize_dtw_path(distance_matrix, dtw_path_indices, baseline, candidate, p
     plt.close(fig)
     return pathname
 
-def generate_aligned_unaligned_path(template_embeddings_dict, candidate_embeddings_dict, distance_matrix, dtw_path, pose_win_sec=0.3):
+def generate_aligned_unaligned_path(baseline_fps, baseline_length, candidate_fps, candidate_length, 
+                                     distance_matrix, dtw_path, pose_win_sec=0.3):
     """
     Categorize the DTW path into aligned and misaligned segments.
 
@@ -144,17 +145,12 @@ def generate_aligned_unaligned_path(template_embeddings_dict, candidate_embeddin
         ed = min(frame_cnt, (index+1) * stride)
         return np.array(list(range(st, ed))).astype(int)
     
-    fps1 = template_embeddings_dict['meta_info']['fps']
-    emb_length1 = len(template_embeddings_dict['embeddings'])
-    fps2 = candidate_embeddings_dict['meta_info']['fps']
-    emb_length2 = len(candidate_embeddings_dict['embeddings'])
-
     result_path = []
     pre_frames_1, pre_frames_2 = None, None
     for i, (index1, index2) in enumerate(dtw_path):
         # fetch the index1 / index2 segment frames from both videos
-        frames_1 = fetch_segment_frames_id(fps1, emb_length1, index1)
-        frames_2 = fetch_segment_frames_id(fps2, emb_length2, index2)
+        frames_1 = fetch_segment_frames_id(baseline_fps, baseline_length, index1)
+        frames_2 = fetch_segment_frames_id(candidate_fps, candidate_length, index2)
         num_f = min(len(frames_1), len(frames_2))
         # adjust the different frame rate
         sampling_idx = np.linspace(0, max(len(frames_1), len(frames_2))-1, num_f).astype(int)
@@ -214,34 +210,6 @@ class SelfSimilarityProbDistance(torch.nn.Module):
 
         return A  # This is optional, as A is modified in-place
     
-    def forward_direct_eatup_memory(self, X, mask_1d, temperature=13.544):
-        # x in shape of [N, seq, samples * dim]: [N, 8, 20 * 16]
-        # N will be padded as power of 2, eg: 512, 1024, 2048, ... 
-        N = X.shape[0]
-        # Expand the 1-D mask to 2-D
-        num_valid = torch.sum(mask_1d)
-        mask_2d = mask_1d.unsqueeze(1) & mask_1d.unsqueeze(0)
-
-        # Expand dimensions
-        a_exp = X.unsqueeze(1).unsqueeze(2)  # [N, 1, 1, 8, 320]
-        b_exp = X.unsqueeze(0).unsqueeze(3)  # [1, N, 8, 1, 320]
-
-        # Compute sequence-to-sequence distances
-        distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8, 8]
-
-        # Average over the sequence length dimensions to get the sequence-to-sequence distances
-        # distances = -torch.log(pairwise_seq_distances.mean(dim=(2,3)))  # This will be [N, N]
-        distances = torch.mean(distances, dim=[-1,-2])
-
-        # distances = distances.unsqueeze(1)  # insert a new dimension [n,s,s] --> [n,1,s,s]
-        # Apply the softmax function
-        distances[~mask_2d] = 0.0
-        distances_soft = F.softmax(-distances[mask_2d].reshape([num_valid, num_valid]) / temperature, dim=-1)
-        
-        self.fill_tensor(distances, distances_soft, mask_2d)
-
-        return distances
-
     def forward(self, X, mask_1d, temperature=13.544):
         # x in shape of [N, seq, samples * dim]: [N, 8, 20 * 16]
         # N will be padded as power of 2, eg: 512, 1024, 2048, ... 
@@ -256,13 +224,13 @@ class SelfSimilarityProbDistance(torch.nn.Module):
         row_indices, col_indices = np.meshgrid(np.arange(num_chunks), np.arange(num_chunks))
 
         for (r, c) in zip(row_indices.ravel(), col_indices.ravel()):
-            # Expand dimensions
-            a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1).unsqueeze(2)  # [N, 1, 1, 8, 320]
-            b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0).unsqueeze(3)  # [1, N, 8, 1, 320]
+            # Expand dimensions for the first dimension
+            a_exp = X[r*self.chunk_size:(r+1)*self.chunk_size].unsqueeze(1)  # [N, 1, 8, 320]
+            b_exp = X[c*self.chunk_size:(c+1)*self.chunk_size].unsqueeze(0)  # [1, N, 8, 320]
             # Compute sequence-to-sequence distances
-            distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8, 8]
+            distances = loss_utils.probabilistic_distance_torch(a_exp, b_exp, self.sigmoid_a, self.sigmoid_b)  # This should be [N, N, 8]
             # Average over the sequence length dimensions to get the sequence-to-sequence distances
-            distances = torch.mean(distances, dim=[-1,-2])  # This will be [N, N]
+            distances = torch.mean(distances, dim=[-1])  # This will be [N, N]
             tsm[r*self.chunk_size:(r+1)*self.chunk_size, c*self.chunk_size:(c+1)*self.chunk_size] = distances
         # Apply the softmax function
         tsm[~mask_2d] = 0.0

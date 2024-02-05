@@ -701,17 +701,15 @@ def probabilistic_distance_torch(A, B, sigmoid_a=5.24, sigmoid_b=11.16, smoothin
             p = (1.0 - smoothing) * p + smoothing / 2.0
         return p
 
-    # Reshape A and B to [..., 20, 16]
-    A_reshaped = A.reshape(*A.shape[:-1], 20, 16)
-    B_reshaped = B.reshape(*B.shape[:-1], 20, 16)
+    # Reshape A and B to [..., 20, 16] and expand one dimension for broadcasting
+    A_reshaped = A.reshape(*A.shape[:-1], 20, 1, 16)
+    B_reshaped = B.reshape(*B.shape[:-1], 1, 20, 16)
 
     # Compute pairwise L2 distances
     distances = torch.norm(A_reshaped - B_reshaped, dim=-1)
 
     # Apply the scaled sigmoid function
     distances = scaled_sigmoid(distances, sigmoid_a, sigmoid_b, smoothing)
-    distances =  -torch.log(distances.mean(dim=[-1])) 
-
-    # distances =  1 - (distances.mean(dim=[-1]))     
+    distances =  -torch.log(distances.mean(dim=[-1, -2])) 
 
     return distances
