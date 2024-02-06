@@ -100,8 +100,8 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
         plot_3d(ax2, bjoints_2d, base_joints_3d, colors[0], shiftx=0.25)
         plot_3d(ax2, cjoints_2d, cand_joints_3d, colors[1], shiftx=0.25)
 
-        vis_vector(ax2, base_joints_3d, shiftx=0.25)
-        vis_vector(ax2, cand_joints_3d, shiftx=0.25)
+        # vis_vector(ax2, base_joints_3d, shiftx=0.25)
+        # vis_vector(ax2, cand_joints_3d, shiftx=0.25)
         
     trunk_dev = ca.get_trunk_dev(base_joints_3d, cand_joints_3d)   
     trunk_twist_dev = ca.get_trunk_twist_dev(base_joints_3d, cand_joints_3d)   
@@ -126,14 +126,14 @@ def cal_dev(base_joints_3d, cand_joints_3d, bjoints_2d, cjoints_2d, ax2, vis=Fal
 
     fleg_dev = ca.get_leg_dev(base_joints_aligned_low, cand_joints_aligned_low)
 
-    if vis:
+    if False:
         low_idxs = list(range(0, 7))
         plot_3d(ax2, bjoints_2d, base_joints_aligned_low, colors[0], shiftx=0.50, idxs = low_idxs)
 
         plot_3d(ax2, cjoints_2d, cand_joints_aligned_low, colors[1], shiftx=0.50, idxs = low_idxs)
 
-        vis_vector(ax2, base_joints_aligned_low, shiftx=0.5)
-        vis_vector(ax2, cand_joints_aligned_low, shiftx=0.5)
+        # vis_vector(ax2, base_joints_aligned_low, shiftx=0.5)
+        # vis_vector(ax2, cand_joints_aligned_low, shiftx=0.5)
 
     # upper body align
     base_joints_aligned_up, cand_joints_aligned_up = align_candidate_pose_up(base_joints_3d, cand_joints_3d)
@@ -270,7 +270,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     max_bidx, max_cidx = 0, 0
     for t, (b, c, isalign) in enumerate(path_ids):
 
-        # if c < 91:continue
+        # if c < 145:continue
 
         max_cidx = max(max_cidx, c)
         max_bidx = max(max_bidx, b)
@@ -360,6 +360,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
 
     deviations_lst = avg_non_align(path_ids, deviations_lst)
     base_dev_dict = create_dict_bs(path_ids, deviations_lst, max_bidx + 1)
+
     deviations_lst, cand_dev_dict = smooth_deviations(path_ids, deviations_lst, max_cidx + 1)
                       
     with open(save_out_pkl, 'wb') as f:
@@ -372,7 +373,7 @@ def avg_non_align_segment(deviation_info_lst):
     deviations_np = create_np(deviation_info_lst, name="deviations")
 
     # avg_dev = np.nanmean(deviations_np, axis = 0).tolist()
-    avg_dev = np.nanquantile(deviations_np, 0.85, axis = 0).tolist()
+    avg_dev = np.nanquantile(deviations_np, 0.75, axis = 0).tolist()
     
     avg_dev = np.round(avg_dev, 2)
 
@@ -532,9 +533,9 @@ if __name__ == "__main__":
         (14, 8),
         (8, 11),
     ]
-
-    file_names = ['baseline14', 'candidate1']
-    act_name = "Lowering_Crew_Bag" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    
+    file_names = ['baseline12', 'candidate3']
+    act_name = "Shifting_Bag_in_OHB" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
@@ -580,11 +581,13 @@ if __name__ == "__main__":
     path_pairs = utils.pose_embed_video_align(align_path)
     # path_pairs = fine_align.get_pmpjpe_align(video_lst[0], video_lst[1], poses_3ds[0], poses_3ds[1])
     
+    smooth_path_pairs = sa.get_smooth_paths(path_pairs, len(video_lst[0]), len(video_lst[1]))
+
     base_dict, deviations_dict = align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)
 
-    render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
+    # render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
     # render.render_cand_video(video_paths[1], output_cand_video_path, deviations_dict, conf_thresh)
-    # render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, conf_thresh, isblur=False)
+    render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, smooth_path_pairs, conf_thresh, isblur=False, isauto=False)

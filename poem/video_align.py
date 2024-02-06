@@ -138,8 +138,8 @@ def cross_sim_video_align():
     mmcv.mkdir_or_exist(pose_folder)
     task_path = input_dir
 
-    template_names  = ["baseline11", "baseline11", "baseline11"] # "baseline-IMG_0032" # "baseline"
-    candidate_names = ["candidate1", "candidate2", "candidate3"] # "candidate-IMG_0033" # "candidate-good"
+    template_names  = ["baseline19", "baseline19", "baseline19", "baseline19", "baseline19", "baseline19"] # "baseline-IMG_0032" # "baseline"
+    candidate_names = ["baseline16", "baseline18", "baseline26", "candidate1", "candidate2", "candidate3"] # "candidate-IMG_0033" # "candidate-good"
 
     pose_win_sec = 0.3  #pose_win_sec=0.3
 
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # input_dirs = list_subdirs(root_dir) # "Serving_from_Basket" #  # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier'
     gpu_id = 0
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
-    input_dirs = ["/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"]
+    input_dirs = ["/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Removing_Item_from_Bottom_of_Cart/"]
 
     for input_dir in input_dirs:
         print('input_dir ', input_dir)

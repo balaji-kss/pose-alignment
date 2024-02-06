@@ -57,10 +57,9 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
 # 'trunk': [[0, 5], [5.0, 10], [10, 20], [20, 30], [30, sys.maxsize]], # Incorrect lift galley carrier, 
 # 'trunk': [[0, 10], [10.0, 15], [15, 25], [25, 35], [35, sys.maxsize]], # Incorrect lift galley carrier, 
 
-# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-arm = [[0, 20], [20, 30], [30, 80], [80, 120], [120, sys.maxsize]]
-leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
-trunk = [[0, 7.5], [7.5, 15], [15, 35], [35, 50], [50, sys.maxsize]]
+arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]]
+trunk = [[0, 7.5], [7.5, 15], [15, 25], [25, 35], [35, sys.maxsize]]
 
 angle_bounds = {
     'trunk': trunk,
@@ -212,7 +211,15 @@ def print_deviations(frame, deviations, w=100):
 
     trunk_dev, trunk_twist_dev, larm_dev, rarm_dev, lfarm_dev, rfarm_dev, lthigh_dev, rthigh_dev, lleg_dev, rleg_dev, farm_dev, fleg_dev = deviations
 
-    start = 600
+    fh, fw = frame.shape[0], frame.shape[1]
+
+    if fh == 1080 and fw == 1920:
+        w = 500
+        start = 100
+    else:
+        start = 600
+        w = 100
+
     step = 30
     thickness = 2
 
@@ -304,7 +311,7 @@ def render_results(bvideo_path, cvideo_path, dtw_video_path, output_video_path, 
 
             bframe = cv2.putText(bframe, "Frame: " + str(b), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 2, cv2.LINE_AA) 
-            cframe = cv2.putText(cframe, "Frame: " + str(c), (500, 40), cv2.FONT_HERSHEY_SIMPLEX,  
+            cframe = cv2.putText(cframe, "Frame: " + str(c), (500, 500), cv2.FONT_HERSHEY_SIMPLEX,  
                    1, (0, 0, 255), 2, cv2.LINE_AA) 
             
             bframe = cv2.resize(bframe, None, fx = 0.5, fy = 0.5)
@@ -341,7 +348,7 @@ def blur_face(frame, joints2d):
 
     return frame
 
-def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, thresh, isblur = False):
+def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict, deviations_dict, smooth_pair_ids, thresh, isblur = False, isauto=True):
 
     bvideo = mmcv.VideoReader(bvideo_path)
     cvideo = mmcv.VideoReader(cvideo_path)
@@ -352,12 +359,22 @@ def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict,
                                 fourcc, cvideo.fps, (1080, 540))
 
     min_len = min(len(base_dict), len(deviations_dict))
-    
-    bids = utils.pick_equidistant_elements(list(base_dict.keys()), min_len)
-    cids = utils.pick_equidistant_elements(list(deviations_dict.keys()), min_len)
 
-    for bidx, cidx in zip(bids, cids):
+    if isauto:
+        bids = utils.pick_equidistant_elements(list(base_dict.keys()), min_len)
+        cids = utils.pick_equidistant_elements(list(deviations_dict.keys()), min_len)
+
+        bids = np.expand_dims(bids, axis=1)
+        cids = np.expand_dims(cids, axis=1)
         
+        pair_lst = np.hstack((bids, cids))
+    else:
+        pair_lst = smooth_pair_ids
+
+    for bidx, cidx, isalign in pair_lst:
+        
+        if bidx > max(list(base_dict.keys())) or cidx > max(list(deviations_dict.keys())):continue
+
         bframe = bvideo[bidx].copy()
         deviations = base_dict[bidx][0]
         bjoints_2d = base_dict[bidx][1]
@@ -375,6 +392,11 @@ def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict,
         cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)    
 
         bframe, cframe, _ = crop_images(bframe, cframe)
+        ch, cw = cframe.shape[:2]
+
+        if not isalign:
+            cv2.rectangle(cframe, (0, 0), (cw - 1, ch - 1), (0, 0, 255), 20)
+
         concat = np.hstack((bframe, cframe))
         concat = cv2.resize(concat, None, fx = 0.5, fy = 0.5)
         video_writer.write(concat)
