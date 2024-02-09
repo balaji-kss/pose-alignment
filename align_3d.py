@@ -223,7 +223,7 @@ def mask_dev(deviations, bjoints_2d, cjoints_2d, thresh):
         
     # # Max across right arm
     max_rarm = max(rarm_dev, farm_dev)
-    if max_rarm > lfarm_dev:
+    if max_rarm > rfarm_dev:
         rarm_dev, rfarm_dev = max_rarm, max_rarm
     else:
         rarm_dev, rfarm_dev = max_rarm, rfarm_dev
@@ -361,7 +361,7 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
     deviations_lst = avg_non_align(path_ids, deviations_lst)
     base_dev_dict = create_dict_bs(path_ids, deviations_lst, max_bidx + 1)
 
-    deviations_lst, cand_dev_dict = smooth_deviations(path_ids, deviations_lst, max_cidx + 1)
+    deviations_lst, cand_dev_dict = smooth_deviations(path_ids, deviations_lst, max_cidx + 1, start_end_zero=True)
                       
     with open(save_out_pkl, 'wb') as f:
         pickle.dump(deviations_lst, f)
@@ -475,7 +475,7 @@ def create_dict_np(path_ids, deviations_info_lst, num_cand_frames):
     dev_lst = []
     for i in range(num_cand_frames):
         dev_lst.append(cand_dev_dict[i][0])
-
+    
     return cand_dev_dict, np.array(dev_lst)
 
 def create_dict_bs(path_ids, deviations_info_lst, num_base_frames):
@@ -494,9 +494,31 @@ def create_dict_bs(path_ids, deviations_info_lst, num_base_frames):
     
     return base_dev_dict
 
-def smooth_deviations(path_ids, deviations_info_lst, num_cand_frames, window_size = 5):
+def set_start_end_zero(dev_dict, dev_np, num_cand_frames, pad_perc = 0.1):
+    
+    num_pad = int(pad_perc * num_cand_frames)
+    pad_dev = [0] * 10
+    sidx, eidx = 0, num_pad
+
+    for i in range(sidx, eidx):
+        dev_dict[i][0] = pad_dev
+        dev_np[i] = 0.0
+
+    sidx, eidx = num_cand_frames - num_pad, num_cand_frames
+    for i in range(sidx, eidx):
+        dev_dict[i][0] = pad_dev
+        dev_np[i] = 0.0
+
+    return dev_dict, dev_np
+
+def smooth_deviations(path_ids, deviations_info_lst, num_cand_frames, window_size = 5, start_end_zero=False):
     
     cand_dev_dict, dev_np = create_dict_np(path_ids, deviations_info_lst, num_cand_frames)
+
+    if start_end_zero:
+        cand_dev_dict, dev_np = set_start_end_zero(cand_dev_dict, dev_np, num_cand_frames)
+
+    print('dev_np ', dev_np.shape)
     smooth_devations = window_mean_angle_dev(dev_np, window_size)
     smooth_devations = smooth_devations.tolist()
     deviations_info_lst, cand_dev_dict = update_dict_lst(deviations_info_lst, cand_dev_dict, smooth_devations, path_ids, num_cand_frames)
@@ -534,8 +556,8 @@ if __name__ == "__main__":
         (8, 11),
     ]
     
-    file_names = ['baseline12', 'candidate3']
-    act_name = "Shifting_Bag_in_OHB" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline11', 'candidate3']
+    act_name = "Closing_Overhead_Bin" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
@@ -584,6 +606,10 @@ if __name__ == "__main__":
     smooth_path_pairs = sa.get_smooth_paths(path_pairs, len(video_lst[0]), len(video_lst[1]))
 
     base_dict, deviations_dict = align_pose3d_dev(video_lst, poses_2ds, poses_3ds, path_pairs, out_pkl, vis=False)
+
+    fout_pkl = root_pose + '/final_deviations.pkl'
+    with open(fout_pkl, 'wb') as f:
+        pickle.dump(deviations_dict, f)
 
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)

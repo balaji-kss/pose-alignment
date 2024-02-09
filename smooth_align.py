@@ -93,7 +93,7 @@ def gen_ids(base_segment_lst, cand_segment_lst, isalign):
 
     return pair_lst
 
-def get_smooth_paths(path_ids, num_base_frames, num_cand_frames, thresh = 0.3):
+def get_smooth_paths(path_ids, num_base_frames, num_cand_frames, thresh = 0.4):
 
     path_ids_np = np.array(path_ids)
 
@@ -106,6 +106,9 @@ def get_smooth_paths(path_ids, num_base_frames, num_cand_frames, thresh = 0.3):
     cand_non_align_seg = []
 
     for na_idx in non_align_se:
+        # ignore non-aligns at the start and end of video 
+        # because the activity might not have started
+        if na_idx == 0 or na_idx == len(segments) - 1:continue 
         sidx = segments[na_idx][1]
         eidx = segments[na_idx][2]
         len_seg = eidx - sidx
@@ -124,11 +127,18 @@ def get_smooth_paths(path_ids, num_base_frames, num_cand_frames, thresh = 0.3):
                 base_non_align_seg.append([path_ids[sidx][0], path_ids[eidx][0]])
                 cand_non_align_seg.append([path_ids[sidx][1], path_ids[eidx][1]])
 
-    base_align_seg = find_missing_segments(base_non_align_seg, 0, num_base_frames - 1)
-    cand_align_seg = find_missing_segments(cand_non_align_seg, 0, num_cand_frames - 1)
+    if len(base_non_align_seg) == 0:
+        base_align_seg = [[0, num_base_frames - 1]]
+        cand_align_seg = [[0, num_cand_frames - 1]]
+    else:
+        base_align_seg = find_missing_segments(base_non_align_seg, 0, num_base_frames - 1)
+        cand_align_seg = find_missing_segments(cand_non_align_seg, 0, num_cand_frames - 1)
     
     align_pairs = gen_ids(base_align_seg, cand_align_seg, isalign=True)
     non_align_pairs = gen_ids(base_non_align_seg, cand_non_align_seg, isalign=False)
+
+    print('align_pairs shape ', align_pairs.shape)
+    print('non_align_pairs shape ', non_align_pairs.shape)
 
     pairs = np.concatenate((align_pairs, non_align_pairs), axis = 0)
 

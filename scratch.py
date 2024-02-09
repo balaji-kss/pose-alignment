@@ -37,32 +37,53 @@
 # kpt_colors = json_data['meta_info']["keypoint_colors"]["__ndarray__"]
 # print('skeleton ', skeleton)
 
+# import numpy as np
+
+# def find_segments(arr):
+#     # Start with an empty list to store the segments
+#     segments = []
+    
+#     # Initialize start index and the initial value
+#     start = 0
+#     current_value = arr[0]
+    
+#     # Iterate over the array
+#     for i in range(1, len(arr)):
+#         # Check if the value has changed
+#         if arr[i] != current_value:
+#             # If it has, record the segment
+#             segments.append((current_value, start, i - 1))
+#             # Update the start index and current value
+#             start = i
+#             current_value = arr[i]
+    
+#     # Add the last segment
+#     segments.append((current_value, start, len(arr) - 1))
+    
+#     return segments
+
+# # Example usage
+# arr = np.array([1,1,1,1,1,1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0])
+# segments = find_segments(arr)
+# print(segments)
+
 import numpy as np
 
-def find_segments(arr):
-    # Start with an empty list to store the segments
-    segments = []
-    
-    # Initialize start index and the initial value
-    start = 0
-    current_value = arr[0]
-    
-    # Iterate over the array
-    for i in range(1, len(arr)):
-        # Check if the value has changed
-        if arr[i] != current_value:
-            # If it has, record the segment
-            segments.append((current_value, start, i - 1))
-            # Update the start index and current value
-            start = i
-            current_value = arr[i]
-    
-    # Add the last segment
-    segments.append((current_value, start, len(arr) - 1))
-    
-    return segments
+# Assuming 'matrix' is your NumPy matrix of shape (N, 22, 3) with non-negative values
+# Example initialization for demonstration
+N = 5  # Example size for N
+matrix = np.random.randint(1, 10, (N, 22, 3))  # Generates a sample matrix with random values in the range [1, 9]
 
-# Example usage
-arr = np.array([1,1,1,1,1,1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0])
-segments = find_segments(arr)
-print(segments)
+# Create a mask to ignore zeros
+mask = matrix != 0
+
+# Apply the mask, replace non-matching elements (zeros) with np.inf for min calculation and -np.inf for max calculation
+masked_min_matrix = np.where(mask, matrix, np.inf)
+masked_max_matrix = np.where(mask, matrix, -np.inf)
+
+# Calculate the min and max across the first and second dimensions
+min_values = masked_min_matrix.min(axis=(0, 1))
+max_values = masked_max_matrix.max(axis=(0, 1))
+
+print("Minimum values, excluding zeros:", min_values)
+print("Maximum values, excluding zeros:", max_values)

@@ -40,7 +40,6 @@ def get_trunk_twist_dev(base_joints_3d, cand_joints_3d):
     base_trunk_twist_angle = np.arccos(np.dot(base_hip_vector, base_shoulder_vector)) * 180.0 / np.pi
     cand_trunk_twist_angle = np.arccos(np.dot(cand_hip_vector, cand_shoulder_vector)) * 180.0 / np.pi
 
-    # print('cand_trunk_twist_angle ', cand_trunk_twist_angle, ' base_trunk_twist_angle ', base_trunk_twist_angle)
     diff_angle = abs(cand_trunk_twist_angle - base_trunk_twist_angle)
 
     return np.round(diff_angle, 2) 
@@ -67,29 +66,11 @@ def get_left_arm_vector(joints_3d):
 
     return larm_vector, [lshoulder, lelbow]
 
-def get_left_arm_dev0(base_joints_3d, cand_joints_3d):
-
-    blarm_vector, _ = get_left_arm_vector(base_joints_3d)
-    clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
-
-    larm_dev = np.arccos(np.dot(clarm_vector, blarm_vector)) * 180.0 / np.pi
-
-    return np.round(larm_dev, 2)
-
 def get_left_arm_dev(base_joints_3d, cand_joints_3d):
 
     blarm_vector, _ = get_left_arm_vector(base_joints_3d)
     clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
     
-    larm_dev = np.arccos(np.dot(clarm_vector, blarm_vector)) * 180.0 / np.pi
-
-    return np.round(larm_dev, 2)
-
-def get_left_arm_dev0(base_joints_3d, cand_joints_3d):
-
-    blarm_vector, _ = get_left_arm_vector(base_joints_3d)
-    clarm_vector, _ = get_left_arm_vector(cand_joints_3d)
-
     larm_dev = np.arccos(np.dot(clarm_vector, blarm_vector)) * 180.0 / np.pi
 
     return np.round(larm_dev, 2)
@@ -219,21 +200,6 @@ def get_farm_dev(base_joints_3d, cand_joints_3d):
 
     return np.round(diff_angle, 2)
 
-def get_farm_dev_0(base_joints_3d, cand_joints_3d):
-
-    blfarm_vector, _ = get_left_forearm_vector(base_joints_3d)
-    clfarm_vector, _ = get_left_forearm_vector(cand_joints_3d)
-
-    brfarm_vector, _ = get_right_forearm_vector(base_joints_3d)
-    crfarm_vector, _ = get_right_forearm_vector(cand_joints_3d)
-
-    base_angle = np.arccos(np.dot(blfarm_vector, brfarm_vector)) * 180.0 / np.pi
-    cand_angle = np.arccos(np.dot(clfarm_vector, crfarm_vector)) * 180.0 / np.pi
-
-    diff_angle = abs(cand_angle - base_angle)
-
-    return np.round(diff_angle, 2)
-
 def get_right_arm_dev(base_joints_3d, cand_joints_3d):
 
     brarm_vector, _ = get_right_arm_vector(base_joints_3d)
@@ -308,8 +274,6 @@ def get_left_leg_dev(base_joints_3d, cand_joints_3d):
     base_angle = np.arccos(np.dot(blthigh_vector, blleg_vector)) * 180.0 / np.pi
     cand_angle = np.arccos(np.dot(clthigh_vector, clleg_vector)) * 180.0 / np.pi
 
-    # print('base_angle ', base_angle, ' cand_angle ', cand_angle)
-
     diff_angle = abs(cand_angle - base_angle)
 
     return np.round(diff_angle, 2)
@@ -325,8 +289,6 @@ def get_right_leg_dev(base_joints_3d, cand_joints_3d):
     base_angle = np.arccos(np.dot(brthigh_vector, brleg_vector)) * 180.0 / np.pi
     cand_angle = np.arccos(np.dot(crthigh_vector, crleg_vector)) * 180.0 / np.pi
 
-    # print('base_angle ', base_angle, ' cand_angle ', cand_angle)
-    
     diff_angle = abs(cand_angle - base_angle)
 
     return np.round(diff_angle, 2)

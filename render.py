@@ -36,30 +36,9 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
                    ["Thorax", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
                    ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
-# Lower_Galley_Carrier
-# arm = [[0, 10], [10, 20], [20, 40], [40, 55], [55, sys.maxsize]]
-# leg = [[0, 5], [5, 10], [10, 25], [25, 35], [35, sys.maxsize]]
-
-# Lowering_Crew_Bag
-# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-# leg = [[0, 10], [10, 15], [15, 25], [25, 35], [35, sys.maxsize]]
-
-# Lifting_Crew_Bag
-# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-# leg = [[0, 5], [5, 10], [10, 25], [25, 35], [35, sys.maxsize]]
-
-# Pushing_cart
-# arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-# leg = [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]]
-
-# 'trunk': [[0, 15], [15, 25], [25, 35], [35, 45], [45, sys.maxsize]], # Incorrect closing overhead bin, Incorrect lowering crew bag
-# 'trunk': [[0, 7.5], [7.5, 15], [15, 25], [25, 40], [40, sys.maxsize]], # Incorrect lift galley carrier, 
-# 'trunk': [[0, 5], [5.0, 10], [10, 20], [20, 30], [30, sys.maxsize]], # Incorrect lift galley carrier, 
-# 'trunk': [[0, 10], [10.0, 15], [15, 25], [25, 35], [35, sys.maxsize]], # Incorrect lift galley carrier, 
-
-arm = [[0, 15], [15, 25], [25, 40], [40, 55], [55, sys.maxsize]]
-leg = [[0, 10], [10, 20], [20, 30], [30, 40], [40, sys.maxsize]]
-trunk = [[0, 7.5], [7.5, 15], [15, 25], [25, 35], [35, sys.maxsize]]
+arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]
 
 angle_bounds = {
     'trunk': trunk,
@@ -388,8 +367,9 @@ def render_compare_video(bvideo_path, cvideo_path, output_video_path, base_dict,
             cframe = blur_face(cframe, cjoints_2d)
 
         bframe = drawSkeleton(bframe, bjoints_2d, deviations, base=True, thresh=thresh)
-                
-        cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)    
+            
+        if isalign:
+            cframe = drawSkeleton(cframe, cjoints_2d, deviations, base=False, thresh=thresh)    
 
         bframe, cframe, _ = crop_images(bframe, cframe)
         ch, cw = cframe.shape[:2]

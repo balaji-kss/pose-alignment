@@ -300,15 +300,18 @@ def merge_videos():
         
     video_writer.release()
 
-def read_joint_files(deviations, bin_path):
+def read_dev_file(deviations, bin_path):
 
     f = open(bin_path, "rb")
     num_frames = 0
-    header_len = 4 * 4
+    header_len = 20
     byte_arr = f.read(header_len)
-    header = np.frombuffer(byte_arr, dtype=np.float32).tolist()
+    header = np.frombuffer(byte_arr, dtype=np.int8).tolist()
+    print('header ', header)
     num_people = int(header[0])
     num_angles_per_person = int(header[1]) * 4
+    print('num_people ', num_people)
+    print('num_angles_per_person ', num_angles_per_person)
 
     while True:
         for j in range(num_people):
@@ -325,23 +328,23 @@ def read_joint_files(deviations, bin_path):
 
 def check_binary():
 
-    pkl_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/angles.pkl"
-    bin_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/Removing_Item_from_Bottom_of_Cart/deviations.bin"
+    pkl_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_c3_deviations.pkl"
+    bin_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_c3_deviations.bin"
 
     deviations_bin = []
     with open(pkl_path, 'rb') as f:
         deviations = pickle.load(f)
 
-    read_joint_files(deviations_bin, bin_path)                     
+    read_dev_file(deviations_bin, bin_path)                     
 
     print('len pkl ', len(deviations))
     print('len bin ', len(deviations_bin))
     
     for i in range(len(deviations_bin)):
-        dev_pkl = deviations[i]['deviations']
+        dev_pkl = deviations[i][0]
         dev_bin = deviations_bin[i]
-        print('dev_pkl ', dev_pkl, len(dev_pkl))
-        print('dev_bin ', dev_bin[3:], len(dev_bin))
+        print('dev_pkl ', np.round(dev_pkl, 2), len(dev_pkl))
+        print('dev_bin ', np.round(dev_bin, 2), len(dev_bin))
 
 if __name__ == "__main__":  
 
