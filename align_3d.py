@@ -318,12 +318,18 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
 
             plot_3d(ax1, cjoints_2d, cjoints_3d, colors[1], shiftx=0.25)
 
-        
+        # if c > 131 and c < 153:
+        #     print(t, b, c, ' bjoints ', np.round(bjoints_2d[14:17], 2), np.round(bjoints_3d[14:17], 2))
+        #     print(t, b, c, ' cjoints ', np.round(cjoints_2d[14:17], 2), np.round(cjoints_3d[14:17], 2))
+
         if not vis:ax2=None
 
         deviations = cal_dev(bjoints_3d, cjoints_3d, bjoints_2d, cjoints_2d, ax2=ax2, vis=vis)
 
         deviations = mask_dev(deviations, bjoints_2d, cjoints_2d, thresh=conf_thresh)
+
+        # if c > 131 and c < 153:
+        #     print(t, c, ' deviations ', np.round(deviations, 2))
 
         deviations_lst.append({'deviations':deviations, 'cjoints_2d':csjoints_2d, 'bjoints_2d':bsjoints_2d})
 
@@ -359,9 +365,9 @@ def align_pose3d_dev(video_lst, poses_2d_list, poses_3d_list, path_ids, save_out
             # plt.show()
 
     deviations_lst = avg_non_align(path_ids, deviations_lst)
-    base_dev_dict = create_dict_bs(path_ids, deviations_lst, max_bidx + 1)
+    base_dev_dict = create_dict_bs(path_ids, deviations_lst, len(base_video))
 
-    deviations_lst, cand_dev_dict = smooth_deviations(path_ids, deviations_lst, max_cidx + 1, start_end_zero=True)
+    deviations_lst, cand_dev_dict = smooth_deviations(path_ids, deviations_lst, len(cand_video), start_end_zero=True)
                       
     with open(save_out_pkl, 'wb') as f:
         pickle.dump(deviations_lst, f)
@@ -461,7 +467,7 @@ def update_dict_lst(dev_info_lst, cand_dev_dict, sm_dev_lst, path_ids, num_cand_
 def create_dict_np(path_ids, deviations_info_lst, num_cand_frames):
 
     cand_dev_dict = {}
-    pad_dev = [0] * 10
+    pad_dev = [0] * 12
     csjoints_2d = np.zeros((23, 3), dtype="float")
 
     for i in range(num_cand_frames):
@@ -475,13 +481,13 @@ def create_dict_np(path_ids, deviations_info_lst, num_cand_frames):
     dev_lst = []
     for i in range(num_cand_frames):
         dev_lst.append(cand_dev_dict[i][0])
-    
+
     return cand_dev_dict, np.array(dev_lst)
 
 def create_dict_bs(path_ids, deviations_info_lst, num_base_frames):
 
     base_dev_dict = {}
-    pad_dev = [0] * 10
+    pad_dev = [0] * 12
     bsjoints_2d = np.zeros((23, 3), dtype="float")
 
     for i in range(num_base_frames):
@@ -497,7 +503,7 @@ def create_dict_bs(path_ids, deviations_info_lst, num_base_frames):
 def set_start_end_zero(dev_dict, dev_np, num_cand_frames, pad_perc = 0.1):
     
     num_pad = int(pad_perc * num_cand_frames)
-    pad_dev = [0] * 10
+    pad_dev = [0] * 12
     sidx, eidx = 0, num_pad
 
     for i in range(sidx, eidx):
@@ -556,12 +562,13 @@ if __name__ == "__main__":
         (8, 11),
     ]
     
-    file_names = ['baseline11', 'candidate3']
-    act_name = "Closing_Overhead_Bin" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline21', 'candidate1']
+    act_name = "Lower_Galley_Carrier" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
     align_path = root_pose + file_names[0] + "_" + file_names[1] + "-dtw_path.json"
+    # align_path = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_b16_dtw_path.json'
     save_vname = root_pose + act_name + "_" + file_names[0] + "_" + file_names[1]
     output_video_path = save_vname + '_falign.mov'
     output_cand_video_path = save_vname + '.mov'
@@ -573,14 +580,17 @@ if __name__ == "__main__":
 
     video_lst, poses_2ds, poses_3ds = [], [], []
     video_paths = []    
+    # pose_paths = ['/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_b16_pose_3db.p', '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_b16_pose_3d.p']
 
-    for file_name in file_names:
+    for i in range(len(file_names)):
+        file_name = file_names[i]
         pose_dir = root_pose + '/poses/joints/'
         video_path = root_pose + 'videos/' + file_name + '.mov'
         video_paths.append(video_path)
         video = mmcv.VideoReader(video_path)
 
         pose_path = pose_dir + file_name + '_pose_3d.p'
+        # pose_path = pose_paths[i]
         pose_path_2d = pose_dir + file_name + '.pkl'
         print('pose_path ', pose_path)
 

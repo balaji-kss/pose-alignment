@@ -328,8 +328,8 @@ def read_dev_file(deviations, bin_path):
 
 def check_binary():
 
-    pkl_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_c3_deviations.pkl"
-    bin_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/b11_c3_deviations.bin"
+    pkl_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lowering_Crew_Bag/b14_c3.pkl"
+    bin_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lowering_Crew_Bag/b14_c3.bin"
 
     deviations_bin = []
     with open(pkl_path, 'rb') as f:
@@ -340,11 +340,13 @@ def check_binary():
     print('len pkl ', len(deviations))
     print('len bin ', len(deviations_bin))
     
-    for i in range(len(deviations_bin)):
-        dev_pkl = deviations[i][0]
-        dev_bin = deviations_bin[i]
-        print('dev_pkl ', np.round(dev_pkl, 2), len(dev_pkl))
-        print('dev_bin ', np.round(dev_bin, 2), len(dev_bin))
+    for i in range(len(deviations)):
+        dev_pkl = np.round(deviations[i][0], 2)
+        dev_bin = np.round(deviations_bin[i], 2)
+        diff = dev_pkl[:10] - dev_bin
+        print(i, ' diff ', diff)
+        # print(i, ' dev_pkl ', dev_pkl, len(dev_pkl))
+        # print(i, ' dev_bin ', dev_bin, len(dev_bin))
 
 if __name__ == "__main__":  
 
