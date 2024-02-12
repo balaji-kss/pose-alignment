@@ -554,8 +554,8 @@ def map_score(angle, cutoff_rng, score_rng):
 def get_score(angle, cutoffs):
 
     idx = 0
-    # weights = [[0, 50], [50, 87.5], [87.5, 100], [100, 100], [100, 100]]
-    weights = [0, 50, 75, 100, 100]
+    weights = [[0, 0], [50, 100], [100, 100], [100, 100], [100, 100]]
+    # weights = [0, 50, 75, 100, 100]
     # weights = [0, 25, 50, 75, 100]
 
     for i in range(len(cutoffs)):
@@ -563,8 +563,8 @@ def get_score(angle, cutoffs):
             idx = i
             break
 
-    # score = map_score(angle, cutoffs[idx], weights[idx])
-    score = weights[idx]
+    score = map_score(angle, cutoffs[idx], weights[idx])
+    # score = weights[idx]
 
     return score
 
@@ -580,12 +580,14 @@ def calc_risk_score_frame(deviations, cutoff_dict, map_idxs):
         key_ = map_idxs[i]
         cutoff_range = cutoff_dict[key_]
         score = get_score(deviations[i], cutoff_range)
+        print(score)
         scores.append(score)    
 
-    print('scores ', scores)
-    # score = np.mean(scores)
-    score = int(stats.mode(scores)[0]) 
-    
+    # print('scores ', scores)
+    score = np.mean(scores)
+    # score = int(stats.mode(scores)[0]) 
+    # score = np.median(scores) 
+
     return score
 
 def calc_risk_score_video(deviations_dict):
@@ -636,8 +638,8 @@ if __name__ == "__main__":
         (8, 11),
     ]
     
-    file_names = ['baseline22', 'baseline24']
-    act_name = "Lift_Galley_Carrier" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline11', 'candidate3']
+    act_name = "Closing_Overhead_Bin" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
