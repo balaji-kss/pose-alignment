@@ -20,6 +20,7 @@ import render
 import calc_angles as ca
 import smooth_align as sa
 np.set_printoptions(precision=3)
+from scipy import stats
 
 def get_min_max(joint_3ds):
 
@@ -539,6 +540,79 @@ def draw_joints_2d(frame, joints_2d_hrnet, num_pts=18):
 
     return frame
 
+def is_angle_in_range(range, angle):
+    
+    return angle >= range[0] and angle < range[1]
+
+def map_score(angle, cutoff_rng, score_rng):
+    
+    score_width = score_rng[1] - score_rng[0]
+    angle_ratio = (angle - cutoff_rng[0]) / (cutoff_rng[1] - cutoff_rng[0])
+    
+    return angle_ratio * score_width + score_rng[0]
+
+def get_score(angle, cutoffs):
+
+    idx = 0
+    # weights = [[0, 50], [50, 87.5], [87.5, 100], [100, 100], [100, 100]]
+    weights = [0, 50, 75, 100, 100]
+    # weights = [0, 25, 50, 75, 100]
+
+    for i in range(len(cutoffs)):
+        if is_angle_in_range(cutoffs[i], angle):
+            idx = i
+            break
+
+    # score = map_score(angle, cutoffs[idx], weights[idx])
+    score = weights[idx]
+
+    return score
+
+def calc_risk_score_frame(deviations, cutoff_dict, map_idxs):
+
+    num_dev = len(deviations)
+    trunk_dev = math.sqrt(deviations[0]**2 + deviations[1]**2)
+    tscore = get_score(trunk_dev, cutoff_dict['trunk'])
+
+    scores = [tscore, tscore, tscore, tscore]
+
+    for i in range(2, num_dev):
+        key_ = map_idxs[i]
+        cutoff_range = cutoff_dict[key_]
+        score = get_score(deviations[i], cutoff_range)
+        scores.append(score)    
+
+    print('scores ', scores)
+    # score = np.mean(scores)
+    score = int(stats.mode(scores)[0]) 
+    
+    return score
+
+def calc_risk_score_video(deviations_dict):
+
+    score = 0.0
+    map_idxs = ['trunk'] * 2 + ['arm'] * 4 + ['leg'] * 4
+    cutoff_dict = {}
+    cutoff_dict['trunk'] = render.trunk
+    cutoff_dict['arm'] = render.arm
+    cutoff_dict['leg'] = render.leg
+
+    num_frames = len(deviations_dict)
+
+    scores = []
+    for i in range(num_frames):
+        score = calc_risk_score_frame(deviations_dict[i][0][:10], cutoff_dict, map_idxs)
+        print(i, score)
+        scores.append(score)
+    scores = np.array(scores)
+
+    score = np.quantile(scores, 0.5)
+    # bscore = stats.mode(scores)[0]
+    # scores = scores[scores!=0.0]
+    print(scores)
+
+    return 100 - score
+
 if __name__ == "__main__":
 
     connections = [
@@ -562,8 +636,8 @@ if __name__ == "__main__":
         (8, 11),
     ]
     
-    file_names = ['baseline21', 'candidate1']
-    act_name = "Lower_Galley_Carrier" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline22', 'baseline24']
+    act_name = "Lift_Galley_Carrier" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'
@@ -624,6 +698,10 @@ if __name__ == "__main__":
     with open(out_pkl, 'rb') as f:
         deviations = pickle.load(f)
 
+    print('num cand frames ', len(video_lst[1]))
+    risk_score = calc_risk_score_video(deviations_dict)
+    print('risk_score ', risk_score)
+
     # render.render_results(video_paths[0], video_paths[1], dtw_video_path, output_video_path, path_pairs, deviations, conf_thresh)
     # render.render_cand_video(video_paths[1], output_cand_video_path, deviations_dict, conf_thresh)
-    render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, smooth_path_pairs, conf_thresh, isblur=False, isauto=False)
+    # render.render_compare_video(video_paths[0], video_paths[1], output_compare_video_path, base_dict, deviations_dict, smooth_path_pairs, conf_thresh, isblur=False, isauto=False)
