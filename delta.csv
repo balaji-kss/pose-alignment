@@ -1,0 +1,49 @@
+Activity,Good Baseline,Candidate,Cutoffs,To discuss,Notes
+Closing_Overhead_Bin,baseline11.mov,"14, 16, 17","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 5], [5.0, 10], [10, 30], [30, 45], [45, sys.maxsize]]","16 - can't see the depth from back view
+17 - same view",Last candidate index is same as baseline for all tasks
+Lift_Galley_Carrier,baseline22.mov,"4, 27, 24","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 5], [5.0, 10], [10, 30], [30, 45], [45, sys.maxsize]]
+","4 - can't see depth from back view - can't increase threshold as we need to identify stagger stance - misalignment aroudn 6 sec
+
+",
+Lifting_Crew_Bag,baseline13.mov,"10, 6, 4,","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 5], [5, 10], [10, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Lower_Galley_Carrier,baseline21.mov,"25, 2, 5","arm = [[0, 10], [10, 20], [20, 65], [65, 85], [85, sys.maxsize]]
+leg = [[0, 5], [5, 10], [10, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 7.5], [7.5, 15], [15, 30], [30, 45], [45, sys.maxsize]]
+",Talk about 5,
+Lowering_Crew_Bag,baseline14.mov,"3, 16, 20, 18","arm = [[0, 20], [20, 30], [30, 80], [80, 120], [120, sys.maxsize]]
+leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 7.5], [7.5, 15], [15, 35], [35, 50], [50, sys.maxsize]]",,
+Pushing_Cart,baseline11.mov ,"10, 13, 6,","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 40], [40, 65], [65, sys.maxsize]]
+trunk = [[0, 10], [10.0, 15], [15, 30], [30, 45], [45, sys.maxsize]]
+",,
+Remove_Full_Cart,baseline13.mov,"4, 15, 17,","arm = [[0, 25], [25, 40], [40, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 5], [5, 10], [10, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10.0, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Remove_Half_Cart,baseline13.mov,"14, 16, 22","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Removing_Item_from_Bottom_of_Cart,baseline19.mov,"16, 18, 26","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Serving_from_Basket,baseline13.mov,,"arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Shifting_Bag_in_OHB,baseline12.mov,,"arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Stow_Full_Cart,,,"arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Stow_Half_Cart,baseline10.mov,,"arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
+Turning_Bag_onto_Side,baseline3.mov,"13, 14, 17, 2","arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+trunk = [[0, 10], [10, 15], [15, 30], [30, 45], [45, sys.maxsize]]",,
