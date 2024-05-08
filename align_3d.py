@@ -580,13 +580,11 @@ def calc_risk_score_frame(deviations, cutoff_dict, map_idxs):
         key_ = map_idxs[i]
         cutoff_range = cutoff_dict[key_]
         score = get_score(deviations[i], cutoff_range)
-        print(score)
+        # print(score)
         scores.append(score)    
 
-    # print('scores ', scores)
     score = np.mean(scores)
-    # score = int(stats.mode(scores)[0]) 
-    # score = np.median(scores) 
+    # print('score ', score)
 
     return score
 
@@ -604,14 +602,12 @@ def calc_risk_score_video(deviations_dict):
     scores = []
     for i in range(num_frames):
         score = calc_risk_score_frame(deviations_dict[i][0][:10], cutoff_dict, map_idxs)
-        print(i, score)
+        # print(i, score)
         scores.append(score)
     scores = np.array(scores)
-
+    print('scores ', scores)
     score = np.quantile(scores, 0.5)
-    # bscore = stats.mode(scores)[0]
-    # scores = scores[scores!=0.0]
-    print(scores)
+    # print(scores)
 
     return 100 - score
 
@@ -638,8 +634,8 @@ if __name__ == "__main__":
         (8, 11),
     ]
     
-    file_names = ['baseline11', 'candidate3']
-    act_name = "Closing_Overhead_Bin" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
+    file_names = ['baseline22', 'candidate3']
+    act_name = "Lift_Galley_Carrier" #"Incorrect_Lowering_crew_Bag" #"Closing_Overhead_Bin" #"Lift_Galley_Carrier" #"Stow_Full_Cart" #"Lift_Luggage" # "Serving_from_Basket"
     # 'Removing_Item_from_Bottom_of_Cart' # #'Serving_from_Basket' # 'Pushing_cart' # 'Lower_Galley_Carrier' #Stowing_carrier
     root_dir = '/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/'
     root_pose = root_dir + act_name + '/'

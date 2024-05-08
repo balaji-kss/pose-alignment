@@ -36,9 +36,13 @@ skeletonMapping = [["Left hip", "Left shoulder"], ["Right hip", "Left hip"], ["R
                    ["Thorax", "Right shoulder"], ["Right hip", "Right knee"], ["Right knee", "Right ankle"],
                    ["Left hip", "Left knee"], ["Thorax", "Head"]]
 
-arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
-leg = [[0, 10], [10, 15], [15, 35], [35, 60], [60, sys.maxsize]]
-trunk = [[0, 7.5], [7.5, 15], [15, 30], [30, 45], [45, sys.maxsize]]
+# arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, sys.maxsize]]
+# leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, sys.maxsize]]
+# trunk = [[0, 5], [5.0, 10], [10, 30], [30, 45], [45, sys.maxsize]]
+
+arm = [[0, 15], [15, 25], [25, 70], [70, 90], [90, 2147483647]]
+leg = [[0, 10], [10, 20], [20, 35], [35, 60], [60, 2147483647]]
+trunk = [[0, 5], [5.0, 10], [10, 30], [30, 45], [45, 2147483647]]
 
 angle_bounds = {
     'trunk': trunk,
