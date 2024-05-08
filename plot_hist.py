@@ -31,6 +31,26 @@ def plot_hist():
         plt.savefig(plot_path, format='jpg', dpi=300) # Add grid lines for better readability (optional)
     # plt.show()
 
+from scipy.optimize import curve_fit
+def exponential_decay(x, a, b):
+    return a * np.exp(-b * x)
+
+def fit_exponential_decay(hist_data, bins):
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+    popt, _ = curve_fit(exponential_decay, bin_centers, hist_data, maxfev=5000)
+    return popt
+
+def calc_hist_score(hist_data, bins):
+
+    params = fit_exponential_decay(hist_data, bins)
+    residuals = hist_data - exponential_decay(0.5 * (bins[:-1] + bins[1:]), *params)
+
+    ss_res = np.sum(residuals**2)
+    ss_tot = np.sum((hist_data - np.mean(hist_data))**2)
+    r_squared = 1 - (ss_res / ss_tot)
+    
+    return r_squared
+
 def calc_metric():
     
     gfiltered_values = []
@@ -59,24 +79,19 @@ def calc_metric():
         json_path = json_paths[i]
         print('json_path ', json_path)
         filtered_values = gfiltered_values[i]
-
-        counts, bin_edges = np.histogram(filtered_values, bins=bin_edges)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        bin_centers -= bin_centers[0]
-        print('bin_centers ', bin_centers)
-        weighted_average = np.sum(counts[:3] * bin_centers[:3]) / np.sum(counts[:3])
-        print('counts ', np.sum(counts[:3]))
-        print('weighted_average ', weighted_average)
-        gcounts.append(np.sum(counts[:3]))
-        gcounts_all.append(counts)
+        bin_edges = np.linspace(min(filtered_values), max(filtered_values), num_bins + 1)
+        counts, bin_edges = np.histogram(filtered_values, bins=bin_edges[:10])
+        print('bin_edges ', bin_edges)
+        print('counts ', counts)
+        rsq = calc_hist_score(counts, bin_edges)
+        gcounts.append(np.sum(counts[:5]))
 
     sorted_pairs = sorted(enumerate(gcounts), key=lambda x: x[1], reverse=True)
     # Extract the sorted indices
     sorted_indices = [index for index, value in sorted_pairs]
     for idx in sorted_indices:
         print(json_paths[idx], 'tot: ', gcounts[idx])
-        print('counts: ', gcounts_all[idx])
         print('*****************')
 
-# calc_metric()
-plot_hist()
+calc_metric()
+# plot_hist()
