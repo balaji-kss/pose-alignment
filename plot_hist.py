@@ -19,7 +19,7 @@ def plot_hist():
         
         # Create a histogram of the filtered values
         plt.figure(figsize=(10, 6))  # Set the size of the figure (optional)
-        plt.hist(filtered_values, bins=20, color='blue', edgecolor='black')  # You can adjust the number of bins
+        plt.hist(filtered_values, bins=10, color='blue', edgecolor='black')  # You can adjust the number of bins
         plt.title('Histogram of raw distance matrix: ' + str(len(filtered_values)))
         plt.xlabel('Value')
         plt.ylabel('Frequency')
@@ -80,10 +80,10 @@ def calc_metric():
         print('json_path ', json_path)
         filtered_values = gfiltered_values[i]
         bin_edges = np.linspace(min(filtered_values), max(filtered_values), num_bins + 1)
-        counts, bin_edges = np.histogram(filtered_values, bins=bin_edges[:10])
-        print('bin_edges ', bin_edges)
-        print('counts ', counts)
-        rsq = calc_hist_score(counts, bin_edges)
+        counts, bin_edges = np.histogram(filtered_values, bins=bin_edges)
+        print('bin_edges ', bin_edges[:5])
+        # print('counts ', counts)
+        # rsq = calc_hist_score(counts, bin_edges)
         gcounts.append(np.sum(counts[:5]))
 
     sorted_pairs = sorted(enumerate(gcounts), key=lambda x: x[1], reverse=True)
@@ -93,5 +93,5 @@ def calc_metric():
         print(json_paths[idx], 'tot: ', gcounts[idx])
         print('*****************')
 
-calc_metric()
-# plot_hist()
+# calc_metric()
+plot_hist()

@@ -6,8 +6,9 @@ import os
 from scipy.linalg import svd
 from scipy.spatial import procrustes
 from scipy.linalg import orthogonal_procrustes
+import json
 
-def plot_3d_joints(ax, joints_3d, joints_2d, color, conf_thresh, shift=[0.0, 0.0], name="hmr"):
+def plot_3d_joints(ax, joints_3d, joints_2d, dcolor, conf_thresh, shift=[0.0, 0.0], name="hmr"):
 
     JOINT_PAIRS_H36M = [
     (0, 1),
@@ -32,9 +33,7 @@ def plot_3d_joints(ax, joints_3d, joints_2d, color, conf_thresh, shift=[0.0, 0.0
 
     for i, connection in enumerate(JOINT_PAIRS_H36M):
         if joints_2d is not None:
-            if joints_2d[connection[0], 2] < conf_thresh or joints_2d[connection[1], 2] < conf_thresh: dcolor = 'black'
-            else:dcolor = color
-        else:dcolor = color
+            if joints_2d[connection[0], 2] < conf_thresh or joints_2d[connection[1], 2] < conf_thresh: continue
         xs = [-joints_3d[connection[0], 0] + shift[0], -joints_3d[connection[1], 0] + shift[0]]
         ys = [joints_3d[connection[0], 1] + shift[1], joints_3d[connection[1], 1] + shift[1]]
         zs = [joints_3d[connection[0], 2], joints_3d[connection[1], 2]]
@@ -66,6 +65,50 @@ def get_3d_pose(pose3d_path, num_people, name="hmr"):
 
     return kpts3d_data, kpts2d_data
 
+def convert_keypoint_definition(keypoints):
+    
+    keypoints_new = np.zeros((17, keypoints.shape[1]))
+    # pelvis is in the middle of l_hip and r_hip
+    keypoints_new[0] = np.mean(keypoints[[11, 12]], axis = 0)
+
+    # thorax is in the middle of l_shoulder and r_shoulder
+    keypoints_new[8] = np.mean(keypoints[[5, 6]], axis = 0)
+
+    # spine is in the middle of thorax and pelvis
+    keypoints_new[7] = np.mean(keypoints[[0, 8]], axis = 0)
+
+    # calculate new neck-base - y of chin, x - avg of eyes and chin
+    keypoints_new[9, 1:] = np.mean(keypoints[[17]], axis = 0)[1:]    
+    keypoints_new[9, 0] = np.mean(keypoints[[1, 2, 17]], axis = 0)[0]
+
+    # calculate head - mid of leye and reye
+    keypoints_new[10] = np.mean(keypoints[[1, 2]], axis = 0)
+
+    # rearrange other keypoints
+    keypoints_new[[1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16]] = \
+        keypoints[[12, 14, 16, 11, 13, 15, 5, 7, 9, 6, 8, 10]]
+
+    return keypoints_new
+
+def get_2d_pose(pose2d_path, num_people):
+
+    with open(pose2d_path, 'rb') as f:
+        poses2d = pickle.load(f)
+
+    num_frames = len(poses2d)
+
+    kpts2d_data = np.zeros((num_people, num_frames, 17, 3), dtype='float')
+    kpts2d_data[:, :, :, :] = np.nan
+
+    for i in range(len(poses2d)):
+        for j in range(len(poses2d[i])):
+            track_id = poses2d[i][j]['track_id']
+            assert track_id >= 0
+            kpts2d = poses2d[i][j]['keypoints']
+            kpts2d = convert_keypoint_definition(kpts2d)
+            kpts2d_data[track_id, i] = kpts2d
+
+    return kpts2d_data
 
 def shift_pose_3d(joints_3d):
 
@@ -174,122 +217,182 @@ def transform_points(points, R, scale, translation):
 
     return transformed_points
 
-def vis_pose3d(pose3d_paths):
+def valid_indices(joints_2d1, joints_2d2):
+
+    indices1 = np.where(joints_2d1[:, 2] >= conf_thresh)[0]
+    indices2 = np.where(joints_2d2[:, 2] >= conf_thresh)[0]
+
+    set1 = set(indices1)
+    set2 = set(indices2)
+
+    # Find intersection
+    common_elements = set1.intersection(set2)
+    
+    mask_ids = [2, 3, 5, 6, 9, 10]
+    val_ids = common_elements - set(mask_ids)
+    non_val_ids = set(range(17)) - val_ids
+    
+    val_ids = np.array(list(val_ids))
+    non_val_ids = np.array(list(non_val_ids))
+
+    return val_ids, non_val_ids
+
+def normal_vector(points):
+    # Assume points is a Nx3 matrix where each row is a point
+    # Calculate two vectors in the plane
+    vector1 = points[1] - points[0]
+    vector2 = points[2] - points[0]
+    
+    # Calculate the normal vector as the cross product of these two vectors
+    normal = np.cross(vector1, vector2)
+    
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+    return normal
+
+def angle_between_planes(joints3d1, joints3d2):
+
+    hip1 = np.mean(joints3d1[[0, 1, 4]], axis = 0)
+    points1 = [joints3d1[11], joints3d1[14], hip1]
+
+    hip2 = np.mean(joints3d2[[0, 1, 4]], axis = 0)
+    points2 = [joints3d2[11], joints3d2[14], hip2]
+
+    # Calculate the normal vectors for each plane
+    normal1 = normal_vector(points1)
+    normal2 = normal_vector(points2)
+    
+    # Use the dot product to calculate the angle between the two normals
+    dot_product = np.dot(normal1, normal2)
+    
+    # Clip the dot product to avoid numerical issues with arccos
+    dot_product = np.clip(dot_product, -1.0, 1.0)
+    
+    # Calculate the angle in radians
+    angle = np.arccos(dot_product)
+    
+    # Optionally, convert to degrees
+    angle_degrees = np.degrees(angle)
+
+    return angle_degrees
+
+def calc_pmjpe(joints_3d1, joints_3d2, val_ids):
+
+    joints_3d1_a = np.zeros_like(joints_3d1)
+    joints_3d2_a = np.zeros_like(joints_3d2)
+
+    # joints_3d1, joints_3d2, disparity = procrustes(joints_3d1[val_ids], joints_3d2[val_ids])
+    disparity = 0
+    mean1 = np.mean(joints_3d1, axis = 0)
+    mean2 = np.mean(joints_3d1, axis = 0)
+
+    joints_3d1_a[:] = mean1
+    joints_3d2_a[:] = mean2
+
+    # joints_3d1_a[val_ids] = joints_3d1[:, :]
+    # joints_3d2_a[val_ids] = joints_3d2[:, :]
+
+    joints_3d1_a[:, :] = joints_3d1[:, :]
+    joints_3d2_a[:, :] = joints_3d2[:, :]
+
+    disp_sqrt = np.sqrt(disparity)
+    disp_sqrt = disp_sqrt / len(val_ids)
+
+    score = np.round(disp_sqrt , 3)
+
+    return joints_3d1_a, joints_3d2_a, score
+
+def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
 
     num_people = 1
-    kpts3d_data1, kpts2d_data1 = get_3d_pose(pose3d_paths[0], num_people, name="hmr")
-    kpts3d_data2, kpts2d_data2 = get_3d_pose(pose3d_paths[1], num_people, name="hmr")
+    kpts3d_data1, _ = get_3d_pose(pose3d_paths[0], num_people, name="hmr")
+    kpts3d_data2, _ = get_3d_pose(pose3d_paths[1], num_people, name="hmr")
+
+    kpts2d_data1 = get_2d_pose(pose2d_paths[0], num_people)
+    kpts2d_data2 = get_2d_pose(pose2d_paths[1], num_people)
 
     num_frames = kpts3d_data1.shape[1]
     fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
     ax.view_init(elev=10, azim=0)
 
-    for t in range(num_frames):
+    avg_pmpjpe = 0
+    avg_angles = 0
+    for bid, cid in pairs:
         
         ax.clear()
         gmins, gmaxs = None, None
 
-        print('time t ', t)
+        # print('bid ', bid, ' cid ', cid)
 
-        for idx in range(1):
-            hmr_joints_3d1  = kpts3d_data1[idx, t]   
-            hmr_joints_2d1  = kpts2d_data1[idx, t]
+        joints_3d1  = kpts3d_data1[0, bid]   
+        joints_2d1  = kpts2d_data1[0, bid]
 
-            hmr_joints_3d2  = kpts3d_data2[idx, t]
-            hmr_joints_2d2  = kpts2d_data2[idx, t]    
-            
-            # standard_pose_ref_3d_np = np.array([standard_pose_ref_3d[k] for k in h36m_joint_indices.keys()])
-            # procrustes_mask = np.array([True if "SHOULDER" in k or "HIP" in k or "ANKLE" in k else False for k in h36m_joint_indices.keys()])
+        joints_3d2  = kpts3d_data2[0, cid]
+        joints_2d2  = kpts2d_data2[0, cid]    
 
-            # c1_part, start_part_trans_local, _, r1, s1, t1 = procrustes_local(standard_pose_ref_3d_np[procrustes_mask], hmr_joints_3d1[procrustes_mask])
-            # c2_part, end_part_trans_local,   _, r2, s2, t2  = procrustes_local(standard_pose_ref_3d_np[procrustes_mask], hmr_joints_3d2[procrustes_mask])
+        angle = angle_between_planes(joints_3d1, joints_3d2)
+        avg_angles += angle
 
-            # hmr_joints_3d1 = transform_points(hmr_joints_3d1, r1, s1, t1)
-            # hmr_joints_3d2  = transform_points(hmr_joints_3d2, r2, s2, t2)
+        val_ids, non_val_ids = valid_indices(joints_2d1, joints_2d2)
+        joints_3d1, joints_3d2, pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids)
+        avg_pmpjpe += pmpjpe
 
-            # c1, _, _ = procrustes(standard_pose_ref_3d_np, hmr_joints_3d1)
-            # canonical_ref = np.zeros_like(standard_pose_ref_3d_np)
-            # canonical_ref = c1 # start_part_trans_local#  
+        joints_2d1[non_val_ids, 2] = 0.0
+        joints_2d2[non_val_ids, 2] = 0.0
 
-            # plot_3d_joints(ax, canonical_ref, joints_2d=None, color='green', conf_thresh=None, shift=[0.0, 0.0], name="hmr")
+        # plot_3d_joints(ax, joints_3d1, joints_2d=joints_2d1, dcolor='blue', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
+        # plot_3d_joints(ax, joints_3d2, joints_2d=joints_2d2, dcolor='red', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
 
-            R, _ = orthogonal_procrustes(hmr_joints_3d1, hmr_joints_3d2)
-            hmr_joints_3d2 = hmr_joints_3d2 @ R
+        # gmin = np.min(joints_3d1) 
+        # gmax = np.max(joints_3d1) 
 
-            print(hmr_joints_2d1.shape)
-            plot_3d_joints(ax, hmr_joints_3d1, joints_2d=None, color='blue', conf_thresh=None, shift=[0.0, 0.0], name="hmr")
-            h1 = get_height(hmr_joints_3d1)
-            plot_3d_joints(ax, hmr_joints_3d2, joints_2d=None, color='red', conf_thresh=None, shift=[0.0, 0.0], name="hmr")
-            h2 = get_height(hmr_joints_3d2)
+        # ax.set_xlim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
+        # ax.set_ylim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
+        # ax.set_zlim([gmin - 0.05, gmax + 0.05]) 
 
-            print('h1 ', h1, ' h2 ', h2)
+        # ax.set_xlabel('X')
+        # ax.set_ylabel('Y')
+        # ax.set_zlabel('Z')
 
-        gmin = np.min(hmr_joints_3d1) 
-        gmax = np.max(hmr_joints_3d1) 
+        # plt.tight_layout()
+        # plt.pause(0.0000000000001)
 
-        ax.set_xlim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
-        ax.set_ylim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
-        ax.set_zlim([gmin - 0.05, gmax + 0.05]) 
+    avg_angles = avg_angles / len(pairs)
+    print('avg_angles ', avg_angles)
 
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+    avg_pmpjpe = avg_pmpjpe / len(pairs)
+    print('avg_pmpjpe ', avg_pmpjpe)
 
-        plt.tight_layout()
-        plt.pause(0.0000000000001)
+def get_pairs(json_path, thresh = 3.5):
+
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+
+    data = np.array(data)
+    
+    indices = np.where((data[:, 2] <= thresh) & (data[:, 3] == 1))[0]
+
+    return data[indices, :2].astype('int')
 
 if __name__ == '__main__':
 
     json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
     json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
     json_paths.sort()
-
+    conf_thresh = 0.35
     pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/Closing_Overhead_Bin/videos/" 
-
-    standard_pose_ref_3d = {
-            "HEAD": np.array([0, 0, 2.0]),
-            "NECK": np.array([0, 0, 1.9]),
-            "THORAX": np.array([0, 0, 1.88]),
-            "PELV": np.array([0, 0, 1.1]),
-            "RSHOULDER": np.array([0.3, 0.0, 1.88]),
-            "LSHOULDER": np.array([-0.3, -0.0, 1.88]),
-            "SPINE": np.array([0.0, 0.0, 1.49]),
-            "RHIP":  np.array([0.3, 0.0, 1.1]),
-            "LHIP": np.array([-0.3, -0.0, 1.1]),
-            "RKNEE": np.array([0.3, 0.0, 0.6]),
-            "LKNEE":  np.array([-0.3, -0.0, 0.6]),
-            "RANKLE":  np.array([0.3, 0.0, 0.0]),
-            "LANKLE":  np.array([-0.3, -0.0, 0.0]),
-            "RELBOW": np.array([0.4, 0.0, 1.5]),
-            "LELBOW": np.array([-0.4, -0.0, 1.5]),
-            "RWRIST": np.array([0.4, 0.0, 1.1]),
-            "LWRIST": np.array([-0.4, -0.0, 1.1])
-        }     
-
-    h36m_joint_indices = {
-        "PELV": 0,
-        "RHIP": 1,
-        "RKNEE": 2,
-        "RANKLE": 3,
-        "LHIP": 4,
-        "LKNEE": 5,
-        "LANKLE": 6,
-        "SPINE": 7,
-        "THORAX": 8,
-        "NECK": 9,
-        "HEAD": 10,
-        "LSHOULDER": 11,
-        "LELBOW": 12,
-        "LWRIST": 13,
-        "RSHOULDER": 14,
-        "RELBOW": 15,
-        "RWRIST": 16
-    }  
     
     for json_path in json_paths:
         name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
-        if name1 not in ["baseline4", "baseline5", "baseline12", "baseline13", "baseline19"]:continue
+        # if name1 not in ["baseline3", "baseline5", "baseline14", "baseline20"]:continue
         pose3d_path1 = os.path.join(pose_dir, name1 + '_pose3d.pkl')
         pose3d_path2 = os.path.join(pose_dir, name2 + '_pose3d.pkl')
-        print(name1, name2)
-        vis_pose3d([pose3d_path1, pose3d_path2])
+        pose3d_paths = [pose3d_path1, pose3d_path2]
+
+        pose2d_path1 = os.path.join(pose_dir, name1 + '_pose2d.pkl')
+        pose2d_path2 = os.path.join(pose_dir, name2 + '_pose2d.pkl')
+        pose2d_paths = [pose2d_path1, pose2d_path2]
+        print('json_path ', json_path)
+        pairs = get_pairs(json_path)
+        
+        vis_pose3d(pairs, pose3d_paths, pose2d_paths)
