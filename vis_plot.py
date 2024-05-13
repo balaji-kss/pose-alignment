@@ -42,6 +42,18 @@ def plot_3d_joints(ax, joints_3d, joints_2d, dcolor, conf_thresh, shift=[0.0, 0.
         if i == 0: ax.plot(xs, ys, zs, 'o-', color=dcolor, label=name)
         else:ax.plot(xs, ys, zs, 'o-', color=dcolor)
 
+def get_idx(pose_dets_frame):
+
+    tid0_idx, tid1_idx = None, None
+    for i in range(len(pose_dets_frame)):
+        tid = pose_dets_frame[i]['track_id']
+        if tid == 0:
+            return i
+        if tid == 1:
+            tid1_idx = i
+
+    return tid1_idx
+
 def get_3d_pose(pose3d_path, num_people, name="hmr"):
 
     with open(pose3d_path, 'rb') as f:
@@ -56,14 +68,16 @@ def get_3d_pose(pose3d_path, num_people, name="hmr"):
     kpts2d_data[:, :, :, :] = np.nan
 
     for i in range(len(poses3d)):
-        for j in range(len(poses3d[i])):
-            track_id = poses3d[i][j]['track_id']
-            assert track_id >= 0
-            kpts3d = poses3d[i][j]['keypoints_3d']
-            kpts3d_data[track_id, i] = kpts3d
-            if name == "hmr": kpts2d = poses3d[i][j]['keypoints_hmr'][:, :2]
-            if name == "vp3d": kpts2d = poses3d[i][j]['keypoints'][:, :2]
-            kpts2d_data[track_id, i] = kpts2d
+        j = get_idx(poses3d[i])
+        if j is None:continue
+        track_id = poses3d[i][j]['track_id']
+        assert track_id >= 0
+        track_id = 0
+        kpts3d = poses3d[i][j]['keypoints_3d']
+        kpts3d_data[track_id, i] = kpts3d
+        if name == "hmr": kpts2d = poses3d[i][j]['keypoints_hmr'][:, :2]
+        if name == "vp3d": kpts2d = poses3d[i][j]['keypoints'][:, :2]
+        kpts2d_data[track_id, i] = kpts2d
 
     return kpts3d_data, kpts2d_data
 
@@ -103,12 +117,14 @@ def get_2d_pose(pose2d_path, num_people):
     kpts2d_data[:, :, :, :] = np.nan
 
     for i in range(len(poses2d)):
-        for j in range(len(poses2d[i])):
-            track_id = poses2d[i][j]['track_id']
-            assert track_id >= 0
-            kpts2d = poses2d[i][j]['keypoints']
-            kpts2d = convert_keypoint_definition(kpts2d)
-            kpts2d_data[track_id, i] = kpts2d
+        j = get_idx(poses2d[i])
+        if j is None:continue
+        track_id = poses2d[i][j]['track_id']
+        assert track_id >= 0
+        track_id = 0
+        kpts2d = poses2d[i][j]['keypoints']
+        kpts2d = convert_keypoint_definition(kpts2d)
+        kpts2d_data[track_id, i] = kpts2d
 
     return kpts2d_data
 
@@ -239,20 +255,28 @@ def valid_indices(joints_2d1, joints_2d2):
 
     return val_ids, non_val_ids
 
-def normal_vector(points):
-    # Assume points is a Nx3 matrix where each row is a point
-    # Calculate two vectors in the plane
-    vector1 = points[1] - points[0]
-    vector2 = points[2] - points[0]
-    
-    # Calculate the normal vector as the cross product of these two vectors
-    normal = np.cross(vector1, vector2)
-    
-    # Normalize the normal vector
-    normal = normal / np.linalg.norm(normal)
-    return normal
+def fit_plane_and_find_normal(points):
+    """ Fit a PCA plane to a set of points and return the normal to the plane. """
+    pca = PCA(n_components=2)  # We are fitting a plane, so we use 2 components
 
-def get_plane_points(joints3d1, joints3d2):
+    # mask nan joints
+    points = points[~np.isnan(points).any(axis=1)]
+    
+    # mask  hand joints
+    points = points[:11]
+
+    pca.fit(points)
+    normal = np.cross(pca.components_[0], pca.components_[1])  # Cross product of the principal components
+    return pca.mean_, normal / np.linalg.norm(normal)  # Normalizing the normal vector
+
+def calculate_angle_between_planes(normal1, normal2):
+    """ Calculate the angle between two planes given their normals. """
+    cosine_angle = np.dot(normal1, normal2) / (np.linalg.norm(normal1) * np.linalg.norm(normal2))
+    cosine_angle = np.clip(cosine_angle, -1, 1)  # Numerical stability
+    angle = np.arccos(cosine_angle)
+    return np.degrees(angle)  # Return the angle in degrees
+
+def angle_bw_planes(joints3d1, joints3d2):
 
     hip1 = np.mean(joints3d1[[0, 1, 4]], axis = 0)
     points1 = [joints3d1[11], joints3d1[14], hip1]
@@ -260,83 +284,19 @@ def get_plane_points(joints3d1, joints3d2):
     hip2 = np.mean(joints3d2[[0, 1, 4]], axis = 0)
     points2 = [joints3d2[11], joints3d2[14], hip2]
 
-    return points1, points2 
-
-def plot_plane0(points_org, ax):
-
-    points = copy.deepcopy(points_org)
-    point1, point2, point3 = points
-    point1[0] = -point1[0]
-    point2[0] = -point2[0]
-    point3[0] = -point3[0]
-
-    print('point1 ', point1)
-    print('point2 ', point2)
-    print('point3 ', point3)
-
-    # Add points to the plot
-    ax.scatter(*zip(*[point1, point2, point3]), color='r')
-    labels = ["1", "2", "3"]
-
-    for i, (x, y, z) in enumerate(points):
-        ax.text(x, y, z, labels[i], color='blue')
-
-
-    # Calculate vectors from point1 to point2 and point1 to point3
-    v1 = point2 - point1
-    v2 = point3 - point1
-
-    # Compute the cross product of these vectors to get the normal vector
-    normal = np.cross(v1, v2)
-
-    # Create x, y grid
-    xx, yy = np.meshgrid(np.linspace(min(point1[0], point2[0], point3[0]) - 0.25, 
-                                 max(point1[0], point2[0], point3[0]) + 0.25, 10),
-                     np.linspace(min(point1[1], point2[1], point3[1]) - 0.25, 
-                                 max(point1[1], point2[1], point3[1]) + 0.25, 10))
+    def normal_vector(points):
+        # Assume points is a Nx3 matrix where each row is a point
+        # Calculate two vectors in the plane
+        vector1 = points[1] - points[0]
+        vector2 = points[2] - points[0]
+        
+        # Calculate the normal vector as the cross product of these two vectors
+        normal = np.cross(vector1, vector2)
+        
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+        return normal
     
-    # Calculate corresponding z values
-    # Plane equation: A*x + B*y + C*z + D = 0
-    # Solving for z: z = -(A*x + B*y + D)/C
-    D = -np.dot(normal, point1)  # Calculate D using any point on the plane
-    z = (-normal[0] * xx - normal[1] * yy - D) / normal[2]
-
-    # Plot the plane
-    ax.plot_surface(xx, yy, z, alpha=0.5, color='b')
-
-def plot_plane(joints3D, ax):
-
-    # data = np.copy(joints3D[:11])
-    data = np.copy(joints3D[[0, 1, 2, 3, 4, 5, 6, 11, 14]])
-    data[:, 0] = -data[:, 0]
-
-    pca = PCA(n_components=2)
-    
-    # Fit PCA on the data
-    pca.fit(data)
-
-    # Mean of the points (used for defining the plane's position)
-    mean = pca.mean_
-
-    # First two principal components (defining the plane)
-    normal = pca.components_[0]
-
-    # Scatter plot of the original data (joints)
-    ax.scatter(data[:, 0], data[:, 1], data[:, 2], color='r', s=100)
-
-    # Create a meshgrid of x, y values
-    xx, yy = np.meshgrid(np.linspace(np.min(data[:,0]), np.max(data[:,0]), 10),
-                        np.linspace(np.min(data[:,1]), np.max(data[:,1]), 10))
-
-    # Calculate corresponding z values for the plane
-    # Plane equation: A*x + B*y + C*z + D = 0, solving for z:
-    D = -np.dot(normal, mean)
-    z = (-normal[0] * xx - normal[1] * yy - D) / normal[2]
-
-    ax.plot_surface(xx, yy, z, alpha=0.5, color='b')
-
-def angle_between_planes(points1, points2):
-
     # Calculate the normal vectors for each plane
     normal1 = normal_vector(points1)
     normal2 = normal_vector(points2)
@@ -354,6 +314,30 @@ def angle_between_planes(points1, points2):
     angle_degrees = np.degrees(angle)
 
     return angle_degrees
+
+def angle_bw_planes_0(skeleton1, skeleton2, ax=None):
+
+    mean1, normal1 = fit_plane_and_find_normal(skeleton1)
+    mean2, normal2 = fit_plane_and_find_normal(skeleton2)
+
+    # Calculate the angle between the two planes
+    angle_between_planes = calculate_angle_between_planes(normal1, normal2)
+    angle_between_planes_s = angle_bw_planes_shoulder(skeleton1, skeleton2)
+
+    diff1 = np.abs(angle_between_planes - angle_between_planes_s)
+    diff2 = np.abs(180 - angle_between_planes - angle_between_planes_s)
+    if diff1 > diff2:
+        angle_between_planes = 180 - angle_between_planes
+
+    if ax is not None:
+        # mean2[0] += 0.5
+        # mean2[1] += 0.5
+        ax.quiver(*mean1, *normal1, length=1, color='r', label='Normal 1')
+        ax.quiver(*mean2, *normal2, length=1, color='b', label='Normal 2')
+        # ax.scatter(-skeleton1[:, 0], skeleton1[:, 1], skeleton1[:, 2], color='r', s=50)
+        # ax.scatter(-skeleton2[:, 0], skeleton2[:, 1], skeleton2[:, 2], color='b', s=50)
+
+    return angle_between_planes
 
 def calc_pmjpe(joints_3d1, joints_3d2, val_ids):
 
@@ -396,7 +380,11 @@ def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
 
     avg_pmpjpe = 0
     avg_angles = 0
-    for bid, cid in pairs:
+    angles_lst = []
+    print('len pairs ', len(pairs))
+    prev_angle = None
+
+    for i, (bid, cid) in enumerate(pairs):
         
         ax.clear()
         gmins, gmaxs = None, None
@@ -409,11 +397,16 @@ def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
         joints_3d2  = kpts3d_data2[0, cid]
         joints_2d2  = kpts2d_data2[0, cid]    
 
-        points1, points2 = get_plane_points(joints_3d1, joints_3d2)
-        plot_plane(joints_3d1, ax)
-        angle = angle_between_planes(points1, points2)
-        print('angle ', np.round(angle, 3))
+        all_nan1 = np.isnan(joints_3d1).all()
+        all_nan2 = np.isnan(joints_3d2).all()
+        
+        if all_nan1 or all_nan2:continue
+
+        angle = angle_bw_planes(joints_3d1, joints_3d2, ax)
+        angles_lst.append(angle)
+        print(i, bid, cid, ' angle ', np.round(angle, 3))
         avg_angles += angle
+        prev_angle = angle
 
         # val_ids, non_val_ids = valid_indices(joints_2d1, joints_2d2)
         # joints_3d1, joints_3d2, pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids)
@@ -423,7 +416,7 @@ def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
         # joints_2d2[non_val_ids, 2] = 0.0
 
         plot_3d_joints(ax, joints_3d1, joints_2d=joints_2d1, dcolor='blue', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
-        # plot_3d_joints(ax, joints_3d2, joints_2d=joints_2d2, dcolor='red', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
+        plot_3d_joints(ax, joints_3d2, joints_2d=joints_2d2, dcolor='red', conf_thresh=conf_thresh, shift=[0.5, 0.5], name="hmr")
 
         gmin = np.min(joints_3d1) 
         gmax = np.max(joints_3d1) 
@@ -439,11 +432,21 @@ def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
         plt.tight_layout()
         plt.pause(0.0000000000001)
 
-    avg_angles = avg_angles / len(pairs)
+    avg_angles = np.round(np.median(angles_lst), 3)
     print('avg_angles ', avg_angles)
 
     avg_pmpjpe = avg_pmpjpe / len(pairs)
     print('avg_pmpjpe ', avg_pmpjpe)
+
+    # plt.figure(figsize=(10, 6))  # Set the size of the figure (optional)
+    # plt.hist(angles_lst, bins=10, color='blue', edgecolor='black')  # You can adjust the number of bins
+    # plt.title('Avg angles: ' + str(avg_angles))
+    # plt.xlabel('Value')
+    # plt.ylabel('Frequency')
+    # # plt.show()
+    # plot_name = json_path.rsplit('/', 1)[1].rsplit('.', 1)[0].rsplit('-', 1)[0] + '.jpg'
+    # plot_path = os.path.join(json_path.rsplit('/', 1)[0], plot_name)
+    # plt.savefig(plot_path, format='jpg', dpi=300)
 
 def get_pairs(json_path, thresh = 3.5):
 
@@ -459,17 +462,20 @@ def get_pairs(json_path, thresh = 3.5):
 
 if __name__ == '__main__':
 
-    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lift_Galley_Carrier/"
+    task_name = "Closing_Overhead_Bin"
+    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/"
     json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
     json_paths.sort()
     conf_thresh = 0.35
-    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/Lift_Galley_Carrier/videos/" 
+    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/" + task_name + "/videos/" 
     
     for json_path in json_paths:
         name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
-        # if name1 not in ["baseline3", "baseline5", "baseline14", "baseline20"]:continue
+        if name2 not in ["baseline1"]: continue
+        if name1 not in ["baseline2"]:continue
         pose3d_path1 = os.path.join(pose_dir, name1 + '_pose3d.pkl')
         pose3d_path2 = os.path.join(pose_dir, name2 + '_pose3d.pkl')
+        
         pose3d_paths = [pose3d_path1, pose3d_path2]
 
         pose2d_path1 = os.path.join(pose_dir, name1 + '_pose2d.pkl')
@@ -477,5 +483,5 @@ if __name__ == '__main__':
         pose2d_paths = [pose2d_path1, pose2d_path2]
         print('json_path ', json_path)
         pairs = get_pairs(json_path)
-        
+        print('pairs ', pairs)
         vis_pose3d(pairs, pose3d_paths, pose2d_paths)

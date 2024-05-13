@@ -4,7 +4,7 @@ import os
 import glob
 import numpy as np
 
-directory_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
+directory_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lift_Galley_Carrier/"
 json_paths = glob.glob(os.path.join(directory_path, '*.json'), recursive=False)
 
 def plot_hist(candidate_name):
@@ -96,4 +96,4 @@ def calc_metric():
         print('*****************')
 
 # calc_metric()
-plot_hist('candidate2')
+plot_hist('candidate1')

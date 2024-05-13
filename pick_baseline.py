@@ -7,6 +7,7 @@ from scipy.spatial import procrustes
 import mmcv
 import cv2
 from scipy.optimize import curve_fit
+from vis_plot import angle_bw_planes, get_2d_pose, get_3d_pose
 
 def exponential_decay(x, a, b):
     return a * np.exp(-b * x)
@@ -27,44 +28,28 @@ def calc_hist_score(hist_data, bins):
     
     return round(r_squared, 3)
 
-def custom_clustering(data, max_diff=15):
-    # Sort the data to make comparisons between consecutive elements
-    sorted_data = data
-    sorted_data.sort()
-    print('sorted_data ', np.array(sorted_data)[:, 0])
-
+def custom_clustering(numbers, max_diff=10):
+    # Sort the list of numbers
+    numbers.sort()
+    
     # Initialize the first cluster
     clusters = []
-    current_cluster = [sorted_data[0]]
+    current_cluster = [numbers[0]]
     
-    # Iterate through the sorted data
-    for i in range(1, len(sorted_data)):
-        # Check if the next element should be in the same cluster
-        if sorted_data[i][0] - sorted_data[i - 1][0] <= max_diff:
-            current_cluster.append(sorted_data[i])
-        else:
-            # If not, add the current cluster to the list of clusters and start a new one
+    # Iterate through the sorted numbers
+    for number in numbers[1:]:
+        # Check if adding this number exceeds the max difference in the current cluster
+        if number[0] - current_cluster[0][0] > max_diff:
+            # If yes, start a new cluster
             clusters.append(current_cluster)
-            current_cluster = [sorted_data[i]]
+            current_cluster = [number]
+        else:
+            # Otherwise, add the number to the current cluster
+            current_cluster.append(number)
     
-    # Add the last cluster to the list if not empty
-    if current_cluster:
-        clusters.append(current_cluster)
-    
+    # Add the last cluster if not empty
+    clusters.append(current_cluster)
     return clusters
-
-def normal_vector(points):
-    # Assume points is a Nx3 matrix where each row is a point
-    # Calculate two vectors in the plane
-    vector1 = points[1] - points[0]
-    vector2 = points[2] - points[0]
-    
-    # Calculate the normal vector as the cross product of these two vectors
-    normal = np.cross(vector1, vector2)
-    
-    # Normalize the normal vector
-    normal = normal / np.linalg.norm(normal)
-    return normal
 
 def angle_bw_planes_frame(joints3d1, joints3d2):
 
@@ -74,6 +59,19 @@ def angle_bw_planes_frame(joints3d1, joints3d2):
     hip2 = np.mean(joints3d2[[0, 1, 4]], axis = 0)
     points2 = [joints3d2[11], joints3d2[14], hip2]
 
+    def normal_vector(points):
+        # Assume points is a Nx3 matrix where each row is a point
+        # Calculate two vectors in the plane
+        vector1 = points[1] - points[0]
+        vector2 = points[2] - points[0]
+        
+        # Calculate the normal vector as the cross product of these two vectors
+        normal = np.cross(vector1, vector2)
+        
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+        return normal
+    
     # Calculate the normal vectors for each plane
     normal1 = normal_vector(points1)
     normal2 = normal_vector(points2)
@@ -103,26 +101,6 @@ def get_pairs(json_path):
 
     return data[indices, :2].astype('int')
 
-def get_3d_pose(pose3d_path, num_people):
-
-    with open(pose3d_path, 'rb') as f:
-        poses3d = pickle.load(f)
-
-    num_frames = len(poses3d)
-
-    kpts3d_data = np.zeros((num_people, num_frames, 17, 3), dtype='float')
-    kpts3d_data[:, :, :, :] = np.nan
-
-    for i in range(len(poses3d)):
-        for j in range(len(poses3d[i])):
-            track_id = poses3d[i][j]['track_id']
-            assert track_id >= 0
-            if track_id != 0:continue
-            kpts3d = poses3d[i][j]['keypoints_3d']
-            kpts3d_data[track_id, i] = kpts3d
-
-    return kpts3d_data
-
 def convert_keypoint_definition(keypoints):
     
     keypoints_new = np.zeros((17, keypoints.shape[1]))
@@ -148,44 +126,31 @@ def convert_keypoint_definition(keypoints):
 
     return keypoints_new
 
-def get_2d_pose(pose2d_path, num_people):
-
-    with open(pose2d_path, 'rb') as f:
-        poses2d = pickle.load(f)
-
-    num_frames = len(poses2d)
-
-    kpts2d_data = np.zeros((num_people, num_frames, 17, 3), dtype='float')
-    kpts2d_data[:, :, :, :] = np.nan
-
-    for i in range(len(poses2d)):
-        for j in range(len(poses2d[i])):
-            track_id = poses2d[i][j]['track_id']
-            assert track_id >= 0
-            if track_id != 0:continue
-            kpts2d = poses2d[i][j]['keypoints']
-            kpts2d = convert_keypoint_definition(kpts2d)
-            kpts2d_data[track_id, i] = kpts2d
-
-    return kpts2d_data
-
 def angle_bw_planes_video(pairs, pose3d_path1, pose3d_path2):
 
     num_people = 1
-    poses_3d1 = get_3d_pose(pose3d_path1, num_people)
-    poses_3d2 = get_3d_pose(pose3d_path2, num_people)
-    avg_angles = 0
-
+    poses_3d1, _ = get_3d_pose(pose3d_path1, num_people)
+    poses_3d2, _ = get_3d_pose(pose3d_path2, num_people)
+    angles_lst = []
+    
     for bid, cid in pairs:
 
         joints_3d1  = poses_3d1[0, bid]   
         joints_3d2  = poses_3d2[0, cid]
 
-        angle = angle_bw_planes_frame(joints_3d1, joints_3d2)
-        if np.isnan(angle):continue
-        avg_angles += angle
+        all_nan1 = np.isnan(joints_3d1).all()
+        all_nan2 = np.isnan(joints_3d2).all()
 
-    avg_angles = avg_angles / len(pairs)
+        if all_nan1 or all_nan2:continue
+
+        # angle = angle_bw_planes_frame(joints_3d1, joints_3d2)
+        angle = angle_bw_planes(joints_3d1, joints_3d2)
+        
+        if np.isnan(angle):continue
+        
+        angles_lst.append(angle)
+
+    avg_angles = np.median(angles_lst)
     
     return round(avg_angles, 3)
 
@@ -204,7 +169,7 @@ def cluster_baselines(json_paths, pose_dir, candidate_name):
         angle_bw_planes = angle_bw_planes_video(pairs, pose3d_path1, pose3d_path2)
         baseline_angles.append([angle_bw_planes, json_path])
     
-    clusters = custom_clustering(baseline_angles, max_diff=5)
+    clusters = custom_clustering(baseline_angles, max_diff=20)
 
     return clusters
 
@@ -219,6 +184,7 @@ def valid_indices(joints_2d1, joints_2d2, conf_thresh=0.35):
     # Find intersection
     val_ids = set1.intersection(set2)
     mask_ids = [2, 3, 5, 6, 9, 10]
+    
     val_ids = val_ids - set(mask_ids)
     non_val_ids = set(range(17)) - val_ids
     
@@ -244,7 +210,7 @@ def calc_pmjpe(joints_3d1, joints_3d2, val_ids):
     joints_3d2_a[val_ids] = joints_3d2[:, :]
 
     disp_sqrt = np.sqrt(disparity)
-    # disp_sqrt = disp_sqrt / len(val_ids)
+    disp_sqrt = disp_sqrt / len(val_ids)
 
     score = np.round(disp_sqrt , 3)
 
@@ -262,8 +228,8 @@ def calc_pmjpe_video_pair(json_path):
     pose2d_path1 = os.path.join(pose_dir, name1 + '_pose2d.pkl')
     pose2d_path2 = os.path.join(pose_dir, name2 + '_pose2d.pkl')
     
-    poses_3d1 = get_3d_pose(pose3d_path1, num_people)
-    poses_3d2 = get_3d_pose(pose3d_path2, num_people)
+    poses_3d1, _ = get_3d_pose(pose3d_path1, num_people)
+    poses_3d2, _ = get_3d_pose(pose3d_path2, num_people)
 
     poses_2d1 = get_2d_pose(pose2d_path1, num_people)
     poses_2d2 = get_2d_pose(pose2d_path2, num_people)
@@ -374,16 +340,17 @@ def calc_hist_clusters(clusters):
 
 if __name__ == '__main__':
 
-    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
+    task_name = "Lifting_Crew_Bag"
+    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/"
     json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
-    task_name = "Lift_Galley_Carrier"
     pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/" + task_name + "/videos/" 
     video_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/videos/" 
-    candidate_name = "candidate1"
+    candidate_name = "baseline18"
     
     clusters = cluster_baselines(json_paths, pose_dir, candidate_name)  
+    print('clusters ', clusters)
     
     clusters_pose = calc_pmpjpe_clusters(clusters)
     create_mosaic(video_dir, clusters_pose, name='pmpjpe')
-    clusters_hist = calc_hist_clusters(clusters)
-    create_mosaic(video_dir, clusters_hist, name='hist')
+    # clusters_hist = calc_hist_clusters(clusters)
+    # create_mosaic(video_dir, clusters_hist, name='hist')
