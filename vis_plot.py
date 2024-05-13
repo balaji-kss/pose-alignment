@@ -7,6 +7,8 @@ from scipy.linalg import svd
 from scipy.spatial import procrustes
 from scipy.linalg import orthogonal_procrustes
 import json
+import copy
+from sklearn.decomposition import PCA
 
 def plot_3d_joints(ax, joints_3d, joints_2d, dcolor, conf_thresh, shift=[0.0, 0.0], name="hmr"):
 
@@ -250,13 +252,90 @@ def normal_vector(points):
     normal = normal / np.linalg.norm(normal)
     return normal
 
-def angle_between_planes(joints3d1, joints3d2):
+def get_plane_points(joints3d1, joints3d2):
 
     hip1 = np.mean(joints3d1[[0, 1, 4]], axis = 0)
     points1 = [joints3d1[11], joints3d1[14], hip1]
 
     hip2 = np.mean(joints3d2[[0, 1, 4]], axis = 0)
     points2 = [joints3d2[11], joints3d2[14], hip2]
+
+    return points1, points2 
+
+def plot_plane0(points_org, ax):
+
+    points = copy.deepcopy(points_org)
+    point1, point2, point3 = points
+    point1[0] = -point1[0]
+    point2[0] = -point2[0]
+    point3[0] = -point3[0]
+
+    print('point1 ', point1)
+    print('point2 ', point2)
+    print('point3 ', point3)
+
+    # Add points to the plot
+    ax.scatter(*zip(*[point1, point2, point3]), color='r')
+    labels = ["1", "2", "3"]
+
+    for i, (x, y, z) in enumerate(points):
+        ax.text(x, y, z, labels[i], color='blue')
+
+
+    # Calculate vectors from point1 to point2 and point1 to point3
+    v1 = point2 - point1
+    v2 = point3 - point1
+
+    # Compute the cross product of these vectors to get the normal vector
+    normal = np.cross(v1, v2)
+
+    # Create x, y grid
+    xx, yy = np.meshgrid(np.linspace(min(point1[0], point2[0], point3[0]) - 0.25, 
+                                 max(point1[0], point2[0], point3[0]) + 0.25, 10),
+                     np.linspace(min(point1[1], point2[1], point3[1]) - 0.25, 
+                                 max(point1[1], point2[1], point3[1]) + 0.25, 10))
+    
+    # Calculate corresponding z values
+    # Plane equation: A*x + B*y + C*z + D = 0
+    # Solving for z: z = -(A*x + B*y + D)/C
+    D = -np.dot(normal, point1)  # Calculate D using any point on the plane
+    z = (-normal[0] * xx - normal[1] * yy - D) / normal[2]
+
+    # Plot the plane
+    ax.plot_surface(xx, yy, z, alpha=0.5, color='b')
+
+def plot_plane(joints3D, ax):
+
+    # data = np.copy(joints3D[:11])
+    data = np.copy(joints3D[[0, 1, 2, 3, 4, 5, 6, 11, 14]])
+    data[:, 0] = -data[:, 0]
+
+    pca = PCA(n_components=2)
+    
+    # Fit PCA on the data
+    pca.fit(data)
+
+    # Mean of the points (used for defining the plane's position)
+    mean = pca.mean_
+
+    # First two principal components (defining the plane)
+    normal = pca.components_[0]
+
+    # Scatter plot of the original data (joints)
+    ax.scatter(data[:, 0], data[:, 1], data[:, 2], color='r', s=100)
+
+    # Create a meshgrid of x, y values
+    xx, yy = np.meshgrid(np.linspace(np.min(data[:,0]), np.max(data[:,0]), 10),
+                        np.linspace(np.min(data[:,1]), np.max(data[:,1]), 10))
+
+    # Calculate corresponding z values for the plane
+    # Plane equation: A*x + B*y + C*z + D = 0, solving for z:
+    D = -np.dot(normal, mean)
+    z = (-normal[0] * xx - normal[1] * yy - D) / normal[2]
+
+    ax.plot_surface(xx, yy, z, alpha=0.5, color='b')
+
+def angle_between_planes(points1, points2):
 
     # Calculate the normal vectors for each plane
     normal1 = normal_vector(points1)
@@ -330,32 +409,35 @@ def vis_pose3d(pairs, pose3d_paths, pose2d_paths):
         joints_3d2  = kpts3d_data2[0, cid]
         joints_2d2  = kpts2d_data2[0, cid]    
 
-        angle = angle_between_planes(joints_3d1, joints_3d2)
+        points1, points2 = get_plane_points(joints_3d1, joints_3d2)
+        plot_plane(joints_3d1, ax)
+        angle = angle_between_planes(points1, points2)
+        print('angle ', np.round(angle, 3))
         avg_angles += angle
 
-        val_ids, non_val_ids = valid_indices(joints_2d1, joints_2d2)
-        joints_3d1, joints_3d2, pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids)
-        avg_pmpjpe += pmpjpe
+        # val_ids, non_val_ids = valid_indices(joints_2d1, joints_2d2)
+        # joints_3d1, joints_3d2, pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids)
+        # avg_pmpjpe += pmpjpe
 
-        joints_2d1[non_val_ids, 2] = 0.0
-        joints_2d2[non_val_ids, 2] = 0.0
+        # joints_2d1[non_val_ids, 2] = 0.0
+        # joints_2d2[non_val_ids, 2] = 0.0
 
-        # plot_3d_joints(ax, joints_3d1, joints_2d=joints_2d1, dcolor='blue', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
+        plot_3d_joints(ax, joints_3d1, joints_2d=joints_2d1, dcolor='blue', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
         # plot_3d_joints(ax, joints_3d2, joints_2d=joints_2d2, dcolor='red', conf_thresh=conf_thresh, shift=[0.0, 0.0], name="hmr")
 
-        # gmin = np.min(joints_3d1) 
-        # gmax = np.max(joints_3d1) 
+        gmin = np.min(joints_3d1) 
+        gmax = np.max(joints_3d1) 
 
-        # ax.set_xlim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
-        # ax.set_ylim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
-        # ax.set_zlim([gmin - 0.05, gmax + 0.05]) 
+        ax.set_xlim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
+        ax.set_ylim([gmin - 0.1, gmax + 0.1])  # Adjust as necessary
+        ax.set_zlim([gmin - 0.05, gmax + 0.05]) 
 
-        # ax.set_xlabel('X')
-        # ax.set_ylabel('Y')
-        # ax.set_zlabel('Z')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
 
-        # plt.tight_layout()
-        # plt.pause(0.0000000000001)
+        plt.tight_layout()
+        plt.pause(0.0000000000001)
 
     avg_angles = avg_angles / len(pairs)
     print('avg_angles ', avg_angles)
@@ -370,17 +452,18 @@ def get_pairs(json_path, thresh = 3.5):
 
     data = np.array(data)
     
-    indices = np.where((data[:, 2] <= thresh) & (data[:, 3] == 1))[0]
+    # indices = np.where((data[:, 2] <= thresh) & (data[:, 3] == 1))[0]
+    indices = np.where(data[:, 3] == 1)[0]
 
     return data[indices, :2].astype('int')
 
 if __name__ == '__main__':
 
-    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
+    json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lift_Galley_Carrier/"
     json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
     json_paths.sort()
     conf_thresh = 0.35
-    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/Closing_Overhead_Bin/videos/" 
+    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/Lift_Galley_Carrier/videos/" 
     
     for json_path in json_paths:
         name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')

@@ -31,6 +31,7 @@ def custom_clustering(data, max_diff=15):
     # Sort the data to make comparisons between consecutive elements
     sorted_data = data
     sorted_data.sort()
+    print('sorted_data ', np.array(sorted_data)[:, 0])
 
     # Initialize the first cluster
     clusters = []
@@ -116,6 +117,7 @@ def get_3d_pose(pose3d_path, num_people):
         for j in range(len(poses3d[i])):
             track_id = poses3d[i][j]['track_id']
             assert track_id >= 0
+            if track_id != 0:continue
             kpts3d = poses3d[i][j]['keypoints_3d']
             kpts3d_data[track_id, i] = kpts3d
 
@@ -160,6 +162,7 @@ def get_2d_pose(pose2d_path, num_people):
         for j in range(len(poses2d[i])):
             track_id = poses2d[i][j]['track_id']
             assert track_id >= 0
+            if track_id != 0:continue
             kpts2d = poses2d[i][j]['keypoints']
             kpts2d = convert_keypoint_definition(kpts2d)
             kpts2d_data[track_id, i] = kpts2d
@@ -201,7 +204,7 @@ def cluster_baselines(json_paths, pose_dir, candidate_name):
         angle_bw_planes = angle_bw_planes_video(pairs, pose3d_path1, pose3d_path2)
         baseline_angles.append([angle_bw_planes, json_path])
     
-    clusters = custom_clustering(baseline_angles, max_diff=15)
+    clusters = custom_clustering(baseline_angles, max_diff=5)
 
     return clusters
 
@@ -307,7 +310,8 @@ def create_mosaic(video_dir, clusters_pose, name='pmpjpe'):
     max_rows = len(clusters_pose)
     cand_video_path = os.path.join(video_dir, candidate_name + '.mov')
     mosiac = np.zeros((max_rows * 480, max_cols * 270, 3), dtype='uint8')
-    
+    mosiac[:, :, :] = 128
+
     for i in range(max_rows):
         for j in range(len(clusters_pose[i])):
             angle_bw_planes,  score, vname = clusters_pose[i][j]
@@ -372,11 +376,13 @@ if __name__ == '__main__':
 
     json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
     json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
-    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/Closing_Overhead_Bin/videos/" 
-    video_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/videos/" 
+    task_name = "Lift_Galley_Carrier"
+    pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/" + task_name + "/videos/" 
+    video_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/videos/" 
     candidate_name = "candidate1"
     
     clusters = cluster_baselines(json_paths, pose_dir, candidate_name)  
+    
     clusters_pose = calc_pmpjpe_clusters(clusters)
     create_mosaic(video_dir, clusters_pose, name='pmpjpe')
     clusters_hist = calc_hist_clusters(clusters)

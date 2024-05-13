@@ -7,8 +7,10 @@ import numpy as np
 directory_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Closing_Overhead_Bin/"
 json_paths = glob.glob(os.path.join(directory_path, '*.json'), recursive=False)
 
-def plot_hist():
+def plot_hist(candidate_name):
     for json_path in json_paths:
+        name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
+        if name2 != candidate_name:continue
 
         print('json_path ', json_path)
 
@@ -94,4 +96,4 @@ def calc_metric():
         print('*****************')
 
 # calc_metric()
-plot_hist()
+plot_hist('candidate2')
