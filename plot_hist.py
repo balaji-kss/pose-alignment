@@ -4,14 +4,14 @@ import os
 import glob
 import numpy as np
 
-directory_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Lift_Galley_Carrier/"
+directory_path = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/Removing_Item_from_Bottom_of_Cart/"
 json_paths = glob.glob(os.path.join(directory_path, '*.json'), recursive=False)
 
 def plot_hist(candidate_name):
     for json_path in json_paths:
         name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
         if name2 != candidate_name:continue
-
+        if name1 not in ["baseline2", "baseline8"]:continue
         print('json_path ', json_path)
 
         with open(json_path, 'r') as file:
@@ -26,7 +26,7 @@ def plot_hist(candidate_name):
         plt.xlabel('Value')
         plt.ylabel('Frequency')
         plt.ylim(0, 50)
-        plt.xlim(1.5, 7)
+        plt.xlim(1.5, 10)
         plt.grid(True) 
         plot_name = json_path.rsplit('/', 1)[1].rsplit('.', 1)[0].rsplit('-', 1)[0] + '.jpg'
         plot_path = os.path.join(json_path.rsplit('/', 1)[0], plot_name)
