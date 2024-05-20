@@ -131,15 +131,15 @@ def angle_bw_planes_frame(joints3d1, joints3d2):
 
     return angle_degrees
 
-def filter_frame_pairs(frame_pairs, total_frames_A, total_frames_B, ratio):
+def filter_frame_pairs(frame_pairs, total_frames_A, total_frames_B, ratio = [0.0, 0.0]):
     # Convert the list of tuples to a NumPy array
     frame_pairs = np.array(frame_pairs)
 
     # Calculate the 10% boundary frames for both videos
-    start_A = int(ratio * total_frames_A)
-    end_A = int((1 - ratio) * total_frames_A)
-    start_B = int(ratio * total_frames_B)
-    end_B = int((1 - ratio) * total_frames_B)
+    start_A = int(ratio[0] * total_frames_A)
+    end_A = int((1 - ratio[1]) * total_frames_A)
+    start_B = int(ratio[0] * total_frames_B)
+    end_B = int((1 - ratio[1]) * total_frames_B)
     
     # Filter the frame pairs using NumPy
     mask = (
@@ -150,7 +150,31 @@ def filter_frame_pairs(frame_pairs, total_frames_A, total_frames_B, ratio):
     
     return filtered_pairs
 
-def get_pairs(json_path):
+def get_pairs_cluster(json_path):
+
+    name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
+
+    vpath = os.path.join(video_dir, name1 + '.mov')
+    base_video = mmcv.VideoReader(vpath)
+    
+    vpath = os.path.join(video_dir, name2 + '.mov')
+    cand_video = mmcv.VideoReader(vpath)
+
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+
+    data = np.array(data)
+
+    indices = np.where((data[:, 3] == 1))[0]
+
+    if task_name in ["Serving_from_Basket"]:
+        pairs = filter_frame_pairs(data[indices], len(base_video), len(cand_video), ratio = [0.1, 0.0])
+    else:
+        pairs = filter_frame_pairs(data[indices], len(base_video), len(cand_video), ratio = [0.15, 0.15])
+
+    return pairs[:, :3]
+
+def get_pairs_pmpjpe(json_path, gthresh):
 
     name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
     vpath = os.path.join(video_dir, name1 + '.mov')
@@ -165,11 +189,10 @@ def get_pairs(json_path):
     data = np.array(data)
 
     indices = np.where((data[:, 3] == 1))[0]
-    dist_vals = data[indices, 2]
 
-    indices = np.where((data[:, 2] < np.quantile(dist_vals, 0.6)) & (data[:, 3] == 1))[0]
+    indices = np.where((data[:, 2] < gthresh) & (data[:, 3] == 1))[0]
 
-    pairs = filter_frame_pairs(data[indices], len(base_video), len(cand_video), ratio = 0.15)
+    pairs = filter_frame_pairs(data[indices], len(base_video), len(cand_video), ratio = [0.15, 0.15])
 
     return pairs[:, :2].astype('int')
 
@@ -206,9 +229,9 @@ def angle_bw_planes_video(pairs, pose3d_path1, pose3d_path2):
     angles_lst = []
     
     if len(pairs) == 0:return 180
-    
-    for bid, cid in pairs:
 
+    for bid, cid, _ in pairs:
+        bid, cid = int(bid), int(cid)
         joints_3d1  = poses_3d1[0, bid]   
         joints_3d2  = poses_3d2[0, cid]
 
@@ -223,14 +246,9 @@ def angle_bw_planes_video(pairs, pose3d_path1, pose3d_path2):
         
         angles_lst.append(angle)
     
-    avg_angles = np.median(angles_lst)
-    # print('angles_lst ', angles_lst)
-    print('avg_angles ', avg_angles)
+    if len(angles_lst) == 0:return 180
 
-    # if avg_angles > 90:
-    #     avg_angles = avg_angles - 180
-    # if avg_angles < -90:
-    #     avg_angles = avg_angles + 180
+    avg_angles = np.median(angles_lst)
 
     return round(avg_angles, 3)
 
@@ -241,9 +259,7 @@ def cluster_baselines(json_paths, pose_dir, candidate_name):
         
         name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
         if name2 != candidate_name:continue
-        # if name1 not in ["baseline12", "baseline20"]:continue
-        print(name1, name2, 'cluster baseline')
-        pairs = get_pairs(json_path)
+        pairs = get_pairs_cluster(json_path)
         pose3d_path1 = os.path.join(pose_dir, name1 + '_pose3d.pkl')
         pose3d_path2 = os.path.join(pose_dir, name2 + '_pose3d.pkl')
 
@@ -274,61 +290,15 @@ def valid_indices(joints_2d1, joints_2d2, conf_thresh=0.35):
 
     return val_ids, non_val_ids
 
-def calculate_distance(point1, point2):
-    return np.linalg.norm(np.array(point1) - np.array(point2))
-
-def calculate_body_ratio(skeleton):
-    """
-    Calculate the ratio of average shoulder_hip length to the sum of average hip_knee length and average knee_ankle length.
-    
-    Parameters:
-    skeleton: list of tuples, each representing (x, y) coordinates of key points
-    
-    Returns:
-    float: The ratio of average shoulder_hip length to the sum of average hip_knee length and average knee_ankle length
-    """
-    # Define key points (assuming skeleton is a list of (x, y) tuples)
-    # Indices can vary depending on the skeleton format, adjust accordingly
-    left_shoulder = skeleton[11]
-    right_shoulder = skeleton[14]
-    left_hip = skeleton[4]
-    right_hip = skeleton[1]
-    left_knee = skeleton[5]
-    right_knee = skeleton[2]
-    left_ankle = skeleton[6]
-    right_ankle = skeleton[3]
-    
-    # Calculate distances
-    left_shoulder_hip_length = calculate_distance(left_shoulder, left_hip)
-    right_shoulder_hip_length = calculate_distance(right_shoulder, right_hip)
-    avg_shoulder_hip_length = (left_shoulder_hip_length + right_shoulder_hip_length) / 2
-    
-    left_hip_knee_length = calculate_distance(left_hip, left_knee)
-    right_hip_knee_length = calculate_distance(right_hip, right_knee)
-    avg_hip_knee_length = (left_hip_knee_length + right_hip_knee_length) / 2
-    
-    left_knee_ankle_length = calculate_distance(left_knee, left_ankle)
-    right_knee_ankle_length = calculate_distance(right_knee, right_ankle)
-    avg_knee_ankle_length = (left_knee_ankle_length + right_knee_ankle_length) / 2
-    
-    lower_body_length = avg_hip_knee_length + avg_knee_ankle_length
-    
-    if lower_body_length == 0:  # Prevent division by zero
-        return float('inf')
-    
-    # Calculate the ratio
-    ratio = avg_shoulder_hip_length / lower_body_length
-    return np.round(ratio, 3)
-
-def calc_pmjpe(joints_3d1, joints_3d2, val_ids):
+def calc_pmjpe(joints_3d1, joints_3d2, val_ids, task_name):
     
     if len(val_ids) <= 1:return np.nan
     if np.all(np.isnan(joints_3d1) | (joints_3d1 == -1)):return np.nan
     if np.all(np.isnan(joints_3d2) | (joints_3d2 == -1)):return np.nan
 
-    # joints_3d1, joints_3d2, disparity = procrustes(joints_3d1[val_ids], joints_3d2[val_ids])
-    joints_3d1, joints_3d2, disparity = procrustes(joints_3d1, joints_3d2)
-    
+    if task_name in ["Closing_Overhead_Bin", "Lift_Galley_Carrier", "Lifting_Crew_Bag", "Lower_Galley_Carrier", "Lowering_Crew_Bag", "Remove_Full_Cart", "Stow_Full_Cart"]:
+        joints_3d1, joints_3d2, _ = procrustes(joints_3d1, joints_3d2)
+        
     squared_diff = np.square(joints_3d1[val_ids] - joints_3d2[val_ids])
 
     # Sum the squared differences along each joint dimension
@@ -337,12 +307,11 @@ def calc_pmjpe(joints_3d1, joints_3d2, val_ids):
     # Compute the L2 norm by taking the square root of the sum of squared differences
     disp_sqrt = np.sqrt(np.sum(sum_squared_diff))
 
-    # disp_sqrt = np.sqrt(disparity)
     disp_sqrt = disp_sqrt / len(val_ids)
 
     return disp_sqrt
 
-def calc_pmjpe_video_pair(json_path):
+def calc_pmjpe_video_pair(json_path, gthresh):
 
     num_people = 1
 
@@ -360,8 +329,9 @@ def calc_pmjpe_video_pair(json_path):
     poses_2d1 = get_2d_pose(pose2d_path1, num_people)
     poses_2d2 = get_2d_pose(pose2d_path2, num_people)
 
-    pairs = get_pairs(json_path)
-    avg_pmpjpe = 0
+    pairs = get_pairs_pmpjpe(json_path, gthresh)
+    pmpjpe_lst = []
+    # print('pairs ', pairs)
 
     for bid, cid in pairs:
 
@@ -372,28 +342,23 @@ def calc_pmjpe_video_pair(json_path):
         joints_2d2  = poses_2d2[0, cid]
 
         val_ids, non_val_ids = valid_indices(joints_2d1, joints_2d2)
-        # ratio3d1 = calculate_body_ratio(joints_3d1)
-        # ratio2d1 = calculate_body_ratio(joints_2d1)
-        # ratio3d2 = calculate_body_ratio(joints_3d2)
-        # ratio2d2 = calculate_body_ratio(joints_2d2)
-
-        # print('ratio3d1 ', ratio3d1)
-        # print('ratio3d2 ', ratio3d2)
-        # print('ratio2d1 ', ratio2d1)
-        # print('ratio2d2 ', ratio2d2)
-
-        pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids)
+        pmpjpe = calc_pmjpe(joints_3d1, joints_3d2, val_ids, task_name)
+        
         if np.isnan(pmpjpe): continue
-        avg_pmpjpe += pmpjpe
+        pmpjpe_lst.append(pmpjpe)
     
-    if len(pairs):
-        avg_pmpjpe = avg_pmpjpe / len(pairs)
+    if len(pmpjpe_lst):
+        avg_pmpjpe = np.mean(pmpjpe_lst)
     else:
-        avg_pmpjpe = np.nan
+        avg_pmpjpe = 100
 
-    return avg_pmpjpe, np.round(len(pairs) / poses_3d2.shape[1], 3)
+    ratio = np.round(len(pmpjpe_lst) / poses_3d2.shape[1], 3)
 
-def calc_pmpjpe_clusters(clusters):
+    if ratio <= ratio_thresh: avg_pmpjpe = 100
+
+    return avg_pmpjpe, ratio
+
+def calc_pmpjpe_clusters(clusters, gthresh):
 
     num_clusters = len(clusters)
     gclusters_pmpjpe = []
@@ -402,9 +367,14 @@ def calc_pmpjpe_clusters(clusters):
         for j in range(len(clusters[i])):
             angle_bw_plane, json_path = clusters[i][j]
             name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
-            pmjpe, num_pairs = calc_pmjpe_video_pair(json_path)
+            # if name1 not in ["baseline7"]:continue
+            pmjpe, num_pairs = calc_pmjpe_video_pair(json_path, gthresh)
             clusters_pmpjpe.append([angle_bw_plane, pmjpe, num_pairs, name1])
-        sorted_clusters_pmpjpe = sorted(clusters_pmpjpe, key=lambda x: x[1], reverse=True)
+        
+        if task_name in ["Pushing_Cart"]:
+            sorted_clusters_pmpjpe = sorted(clusters_pmpjpe, key=lambda x: x[2], reverse=True)
+        else:
+            sorted_clusters_pmpjpe = sorted(clusters_pmpjpe, key=lambda x: x[1])
         gclusters_pmpjpe.append(sorted_clusters_pmpjpe)
 
     # Sort outer list based on the average magnitude of the first element
@@ -448,6 +418,74 @@ def create_mosaic(video_dir, clusters_pose, name='pmpjpe'):
     print('mosiac_path ', mosiac_path)
     cv2.imwrite(mosiac_path, canvas)
 
+def create_mosiac_video(video_path_lst, top_n = 5):
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    mosiac_path = mosiac_dir + candidate_name + '_' + 'pmpjpe_5.mp4'
+    video = mmcv.VideoReader(video_path_lst[0])
+    
+    mosaic_width = int(480 + 270 * (len(video_path_lst) - 1))
+    mosaic_height = int(480)
+    out = cv2.VideoWriter(mosiac_path, fourcc, int(video.fps), (mosaic_width, mosaic_height))
+    print('mosaic_width ', mosaic_width)
+    print('mosaic_height ', mosaic_height)
+
+    video_lens = []
+    video_indices = []
+    video_reader_lst = []
+    for video_path in video_path_lst:
+        video = mmcv.VideoReader(video_path)
+        video_lens.append(len(video))
+        video_reader_lst.append(video)
+    min_len = min(video_lens)
+
+    for i in range(len(video_path_lst)):
+        video_len = video_lens[i]
+        indices = np.linspace(0, video_len - 1, min_len)
+        indices = np.round(indices).astype(int)
+        video_indices.append(indices)
+    
+    for i in range(min_len):
+        frames = []
+        for j in range(len(video_reader_lst)):
+            vreader = video_reader_lst[j]
+            index = video_indices[j][i]
+            frame = vreader[index] 
+            frame = cv2.resize(frame, None, fx = 0.25, fy = 0.25)
+            if j == 1:
+                frame = cv2.rectangle(frame, (0, 0), (frame.shape[1]-1, frame.shape[0]-1), (0, 0, 255), 10)
+            if j == 0:
+                frame_pad = np.zeros((480, 480, 3), dtype=np.uint8)
+                frame_pad[:, :, :] = 128
+                frame_pad[:frame.shape[0], :frame.shape[1]] = frame
+            else:
+                frame_pad = frame
+            frames.append(frame_pad)
+        mosaic_frame = np.hstack(frames)
+        print('mosaic_frame shape ', mosaic_frame.shape)
+        out.write(mosaic_frame)
+
+    out.release()
+
+def create_topn(video_dir, clusters_pose, name='pmpjpe', num=5):
+
+    cand_video_path = os.path.join(video_dir, candidate_name + '.mov')
+    video_list = [cand_video_path]
+
+    t = 0
+    for i in range(len(clusters_pose)):
+        for j in range(len(clusters_pose[i])):
+            angle_bw_planes,  score, num_pairs, vname = clusters_pose[i][j]
+            print('angle_bw_planes: ', angle_bw_planes, name, np.round(score, 6), num_pairs, ' vname: ', vname)
+            vpath = os.path.join(video_dir, vname + '.mov')
+            video_list.append(vpath)
+            t += 1
+            if t >= num - 1:break
+        if t >= num - 1:break
+
+    print('len video list ', len(video_list))
+    create_mosiac_video(video_list)
+
 def calc_hist_video(json_path):
 
     with open(json_path, 'r') as file:
@@ -486,6 +524,21 @@ def list_subdirectories(path):
     subdirs = [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
     return subdirs
 
+def get_dist_thresh(json_paths):
+
+    gdist_values = []
+    for json_path in json_paths:
+        
+        name1, name2 = json_path.rsplit('/', 1)[1].rsplit('-')[0].rsplit('_')
+        if name2 != candidate_name:continue
+        # if name1 not in ["baseline12", "baseline20"]:continue
+        pairs = get_pairs_cluster(json_path)
+        gdist_values += pairs[:, 2].tolist()
+    
+    return np.quantile(gdist_values, quant_thresh)
+
+task_thresh_dict = {'Closing_Overhead_Bin': [1.0, 0.1], 'Lift_Galley_Carrier': [0.25, 0.15], 'Lifting_Crew_Bag': [0.25, 0.15], 'Lower_Galley_Carrier': [0.5, 0.15], 'Lowering_Crew_Bag': [0.5, 0.15], 'Pushing_Cart': [0.25, 0.1], 'Remove_Full_Cart': [0.25, 0.1], 'Remove_Half_Cart': [0.15, 0.1], 'Removing_Item_from_Bottom_of_Cart': [0.15, 0.1], 'Serving_from_Basket': [0.25, 0.1], 'Shifting_Bag_in_OHB': [0.25, 0.1], 'Stow_Full_Cart': [0.1, 0.15], 'Stow_Half_Cart': [0.15, 0.15], 'Turning_Bag_onto_Side': [0.5, 0.0]}
+
 if __name__ == '__main__':
 
     root_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/pick_baseline/"
@@ -493,23 +546,31 @@ if __name__ == '__main__':
     task_names.sort()
     task_names.reverse()
 
-    for task_name in task_names[:1]:
+    for task_name in task_names[7:8]:
         # task_name = "Turning_Bag_onto_Side"
+
+        quant_thresh, ratio_thresh = task_thresh_dict[task_name]
+        print('quant_thresh ', quant_thresh)
+        print('ratio_thresh ', ratio_thresh)
+
         json_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/"
         json_paths = glob.glob(os.path.join(json_dir, '*.json'), recursive=False)
         pose_dir = "/home/tumeke-balaji/Documents/results/human-mesh-recovery/delta_data_videos_poses_res/" + task_name + "/videos/" 
         video_dir = "/home/tumeke-balaji/Documents/results/delta/input_videos/delta_all_data/delta_data/" + task_name + "/videos/" 
         mosiac_dir = root_dir + task_name + "/"
-        # candidate_names = ["baseline1", "baseline18", "candidate1", "candidate2", "candidate3"]
-        # candidate_names = ["candidate1"]
+        # candidate_names = ["baseline14", "baseline18"]
+        # candidate_names = ["candidate2"]
         # candidate_names = ["baseline1", "baseline18"]
         candidate_names = ["candidate1", "candidate2", "candidate3"]
 
         for candidate_name in candidate_names:
             print('candidate_name ', candidate_name)
+            gthresh = get_dist_thresh(json_paths)
+            print('gthresh ', gthresh)
             clusters = cluster_baselines(json_paths, pose_dir, candidate_name)  
             
-            clusters_pose = calc_pmpjpe_clusters(clusters)
+            clusters_pose = calc_pmpjpe_clusters(clusters, gthresh)
             create_mosaic(video_dir, clusters_pose, name='pmpjpe')
             # clusters_hist = calc_hist_clusters(clusters)
             # create_mosaic(video_dir, clusters_hist, name='hist')
+            create_topn(video_dir, clusters_pose)
